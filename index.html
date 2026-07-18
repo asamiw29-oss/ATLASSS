@@ -145,7 +145,8 @@
   .acList li{padding:9px 11px;cursor:pointer;border-bottom:1px solid var(--paper-2);display:flex;align-items:flex-start;gap:9px}
   .acList li:last-child{border-bottom:none}
   .acList li:hover,.acList li.hov{background:var(--paper-2)}
-  .acList .ico{flex:0 0 auto;width:10px;height:10px;border-radius:50%;margin-top:6px}
+  .acList .ico{flex:0 0 auto;width:10px;height:10px;border-radius:50%;margin-top:6px;background:var(--line-2)}
+  .acList .ico.gpIco{background:var(--brass)}
   .acList .txt{min-width:0;flex:1}
   .acList .n{font-family:var(--serif);font-weight:500;font-size:14px;line-height:1.3;color:var(--ink)}
   .acList .a{font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.02em;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -360,7 +361,8 @@
   // ============================================================
   const EMBED_CFG = {
     sheet: "1uiJOgTCVmBA8EuRIWlTxq1QK3mHB-5RbWYi4HJ529Ak",
-    apps:  "https://script.google.com/macros/s/AKfycbwCwEFlrSNgcOzN_Na3OHnhcWntwHgwEWIxMjHgGtva0I5_Akq3a4vuMuxywqyL_FE/exec"
+    apps:  "https://script.google.com/macros/s/AKfycbwCwEFlrSNgcOzN_Na3OHnhcWntwHgwEWIxMjHgGtva0I5_Akq3a4vuMuxywqyL_FE/exec",
+    gkey:  "AIzaSyB0A9A7mS69_R3xepjjeKEYIA_WPULfVAI"
   };
   // ============================================================
 
@@ -651,7 +653,7 @@
   let fMacro="ALL",fAirport="ALL",fCat="ALL",filtersOpen=true;
   let map,layer,markers=[],temp=null,tapArmed=false,editing=null,zoomLabels=false;
   let form=blank();
-  function blank(){return{region:"BKK",cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole()};}
+  function blank(){return{region:"BKK",cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:""};}
 
   function getCfg(){if(HAS_EMBED)return{sheet:EMBED_CFG.sheet,apps:EMBED_CFG.apps};try{return JSON.parse(localStorage.getItem(CFG_KEY))||{};}catch(e){return{};}}
   function setCfg(c){try{localStorage.setItem(CFG_KEY,JSON.stringify(c));}catch(e){}}
@@ -895,11 +897,11 @@
   }
   function openAdd(){editing=null;form=blank();if(fAirport!=="ALL")form.region=fAirport;if(fCat!=="ALL"&&!form.cats.includes(fCat))form.cats=[fCat];
     document.getElementById("mTitle").textContent="お店を追加";document.getElementById("mDelete").style.display="none";
-    fill({name:"",memo:"",registrant:getLastReg(),url:""});openM();}
+    newSession();fill({name:"",memo:"",registrant:getLastReg(),url:""});openM();}
   function openEdit(id){const s=stores.find(x=>x.id===id);if(!s)return;editing=id;
-    form={region:s.region,cats:(s.categories&&s.categories.length?s.categories.slice():["other"]),lat:s.lat,lng:s.lng,delivery:!!s.delivery,role:normRole(s.role)};
+    form={region:s.region,cats:(s.categories&&s.categories.length?s.categories.slice():["other"]),lat:s.lat,lng:s.lng,delivery:!!s.delivery,role:normRole(s.role),placeId:s.place_id||""};
     document.getElementById("mTitle").textContent="お店を編集";document.getElementById("mDelete").style.display="";
-    fill({name:s.name,memo:s.memo,registrant:s.registrant,url:s.url});openM();}
+    newSession();fill({name:s.name,memo:s.memo,registrant:s.registrant,url:s.url});openM();}
   function fill(s){
     document.getElementById("fName").value=s.name||"";
     document.getElementById("fRegion").value=form.region;
@@ -943,55 +945,64 @@
     setLatLng(res.lat,res.lng);map.setView([res.lat,res.lng],16);
     const n=document.getElementById("fName");if(res.name&&!n.value.trim())n.value=res.name;validate();inp.value="";}
 
-  // ---- 店名オートコンプリート（Photon = OSM ベース、無料・CORS・カード不要） ----
-  const CUISINE_MAP={ramen:"noodle",noodle:"noodle",soba:"noodle",udon:"noodle",pasta:"yoshoku",sushi:"fish",seafood:"fish",oyster:"fish",japanese:"washoku",washoku:"washoku",kaiseki:"washoku",teppanyaki:"meat",okonomiyaki:"washoku",tempura:"washoku",izakaya:"bar",yakitori:"meat",yakiniku:"meat",bbq:"meat",steak:"meat",grill:"meat",burger:"yoshoku",pizza:"yoshoku",french:"yoshoku",italian:"yoshoku",western:"yoshoku",bistro:"yoshoku",spanish:"yoshoku",mediterranean:"yoshoku",american:"yoshoku",mexican:"yoshoku",coffee:"cafe",cafe:"cafe",tea:"cafe",bakery:"cafe",dessert:"sweets",ice_cream:"sweets",chocolate:"sweets",cake:"sweets",thai:"ethnic",vietnamese:"ethnic",indonesian:"ethnic",malaysian:"ethnic",filipino:"ethnic",indian:"ethnic",turkish:"ethnic",arab:"ethnic",lebanese:"ethnic",asian:"ethnic",chinese:"chinese",dim_sum:"chinese",cantonese:"chinese",sichuan:"chinese",taiwanese:"chinese",korean:"korean"};
-  const OSMV_MAP={cafe:"cafe",bar:"bar",pub:"bar",biergarten:"bar",nightclub:"bar",ice_cream:"sweets",bakery:"cafe",confectionery:"sweets",fast_food:"other",restaurant:"other",food_court:"other",massage:"beauty",beauty:"beauty",hairdresser:"beauty",gift:"souvenir",convenience:"other",attraction:"tourism",museum:"tourism",gallery:"tourism",viewpoint:"tourism",monument:"tourism",memorial:"tourism",castle:"tourism",zoo:"tourism",aquarium:"tourism",theme_park:"tourism",park:"tourism",garden:"tourism",temple:"tourism",shrine:"tourism",place_of_worship:"tourism",artwork:"tourism"};
-  function guessCat(p){
-    if(p.cuisine){for(const c of String(p.cuisine).toLowerCase().split(/[;, ]/)){if(CUISINE_MAP[c])return CUISINE_MAP[c];}}
-    if(p.osm_value&&OSMV_MAP[p.osm_value])return OSMV_MAP[p.osm_value];
-    return"other";
+  // ---- Google Places (New) autocomplete ----
+  const GPLACES_TYPE_MAP={
+    ramen_restaurant:"noodle",noodle_shop:"noodle",udon_restaurant:"noodle",soba_restaurant:"noodle",
+    japanese_restaurant:"washoku",kaiseki_restaurant:"washoku",tempura_restaurant:"washoku",teishoku_restaurant:"washoku",
+    sushi_restaurant:"fish",seafood_restaurant:"fish",
+    chinese_restaurant:"chinese",dim_sum_restaurant:"chinese",
+    korean_restaurant:"korean",korean_barbeque_restaurant:"korean",
+    thai_restaurant:"ethnic",vietnamese_restaurant:"ethnic",indonesian_restaurant:"ethnic",malaysian_restaurant:"ethnic",
+    filipino_restaurant:"ethnic",indian_restaurant:"ethnic",turkish_restaurant:"ethnic",
+    mediterranean_restaurant:"ethnic",middle_eastern_restaurant:"ethnic",greek_restaurant:"ethnic",lebanese_restaurant:"ethnic",
+    afghani_restaurant:"ethnic",asian_restaurant:"ethnic",
+    french_restaurant:"yoshoku",italian_restaurant:"yoshoku",spanish_restaurant:"yoshoku",american_restaurant:"yoshoku",
+    mexican_restaurant:"yoshoku",pizza_restaurant:"yoshoku",hamburger_restaurant:"yoshoku",sandwich_shop:"yoshoku",
+    brazilian_restaurant:"yoshoku",fine_dining_restaurant:"yoshoku",
+    steak_house:"meat",barbecue_restaurant:"meat",yakitori_restaurant:"meat",teppanyaki_restaurant:"meat",
+    bar:"bar",wine_bar:"bar",pub:"bar",night_club:"bar",bar_and_grill:"bar",
+    cafe:"cafe",coffee_shop:"cafe",bakery:"cafe",tea_house:"cafe",breakfast_restaurant:"cafe",brunch_restaurant:"cafe",cat_cafe:"cafe",dog_cafe:"cafe",bagel_shop:"cafe",
+    dessert_shop:"sweets",dessert_restaurant:"sweets",ice_cream_shop:"sweets",donut_shop:"sweets",candy_store:"sweets",chocolate_shop:"sweets",juice_shop:"sweets",confectionery:"sweets",
+    massage:"beauty",spa:"beauty",beauty_salon:"beauty",hair_salon:"beauty",nail_salon:"beauty",wellness_center:"beauty",sauna:"beauty",
+    tourist_attraction:"tourism",museum:"tourism",art_gallery:"tourism",park:"tourism",garden:"tourism",zoo:"tourism",aquarium:"tourism",amusement_park:"tourism",historical_landmark:"tourism",historical_place:"tourism",monument:"tourism",church:"tourism",hindu_temple:"tourism",mosque:"tourism",synagogue:"tourism",place_of_worship:"tourism",cultural_center:"tourism",observation_deck:"tourism",
+    gift_shop:"souvenir",souvenir_shop:"souvenir",
+    store:"goods",shopping_mall:"goods",department_store:"goods",book_store:"goods",clothing_store:"goods",convenience_store:"goods",electronics_store:"goods",jewelry_store:"goods",home_goods_store:"goods",toy_store:"goods",shoe_store:"goods",sporting_goods_store:"goods",supermarket:"goods",furniture_store:"goods",pet_store:"goods",antique_store:"goods",craft_store:"goods",liquor_store:"goods",
+    restaurant:"other",food:"other",food_court:"other",fast_food_restaurant:"other"
+  };
+  function guessCatFromTypes(primary,types){
+    if(primary&&GPLACES_TYPE_MAP[primary])return GPLACES_TYPE_MAP[primary];
+    if(Array.isArray(types)){for(const t of types){if(GPLACES_TYPE_MAP[t])return GPLACES_TYPE_MAP[t];}}
+    return null;
   }
-  function addrOf(p){return[p.housenumber,p.street,p.district,p.city||p.county,p.state,p.country].filter(Boolean).join(" ");}
 
-  let acAbort=null,acTimer=null,acHov=-1,acItems=[];
+  let acAbort=null,acTimer=null,acHov=-1,acItems=[],acSession=null;
+  function newSession(){acSession="s-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);}
+
   async function nameAC(q){
+    const key=EMBED_CFG.gkey;
+    if(!key){acItems=[];renderAC();return;}
     if(acAbort)acAbort.abort();acAbort=new AbortController();
-    let bias="",vbox="";
+    if(!acSession)newSession();
+    const body={input:q,languageCode:"ja",sessionToken:acSession};
     try{const c=map.getCenter(),z=map.getZoom();
       if(z>=6){
-        bias="&lat="+c.lat.toFixed(4)+"&lon="+c.lng.toFixed(4)+"&location_bias_scale=0.6&zoom="+Math.min(z,16);
-        const d=Math.max(0.05,90/Math.pow(2,Math.min(z,14)));
-        vbox="&viewbox="+(c.lng-d).toFixed(4)+","+(c.lat+d).toFixed(4)+","+(c.lng+d).toFixed(4)+","+(c.lat-d).toFixed(4)+"&bounded=0";
+        const rad=Math.min(50000,Math.max(5000,80000/Math.pow(2,Math.max(0,z-8))));
+        body.locationBias={circle:{center:{latitude:c.lat,longitude:c.lng},radius:rad}};
       }
     }catch(e){}
-    const pURL="https://photon.komoot.io/api/?limit=8&q="+encodeURIComponent(q)+bias;
-    const nURL="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&namedetails=1&extratags=1&limit=8&q="+encodeURIComponent(q)+vbox;
     try{
-      const [pR,nR]=await Promise.all([
-        fetch(pURL,{signal:acAbort.signal}).then(r=>r.json()).catch(()=>({features:[]})),
-        fetch(nURL,{signal:acAbort.signal,headers:{"Accept":"application/json"}}).then(r=>r.json()).catch(()=>[])
-      ]);
-      const items=[];
-      ((pR&&pR.features)||[]).forEach(f=>{
-        if(!f.geometry||!f.geometry.coordinates||!f.properties||!f.properties.name)return;
-        const p=f.properties,co=f.geometry.coordinates;
-        items.push({name:p.name,lat:co[1],lng:co[0],address:addrOf(p),cat:guessCat(p)});
+      const r=await fetch("https://places.googleapis.com/v1/places:autocomplete",{
+        method:"POST",signal:acAbort.signal,
+        headers:{"Content-Type":"application/json","X-Goog-Api-Key":key},
+        body:JSON.stringify(body)
       });
-      (Array.isArray(nR)?nR:[]).forEach(x=>{
-        const nd=x.namedetails||{};
-        const nm=nd["name:ja"]||nd["name:en"]||nd.name||(x.display_name&&x.display_name.split(",")[0].trim())||"";
-        if(!nm)return;
-        const lat=parseFloat(x.lat),lng=parseFloat(x.lon);
-        if(isNaN(lat)||isNaN(lng))return;
-        const a=x.address||{};
-        const addr=[a.house_number,a.road,a.neighbourhood,a.suburb,a.city||a.town||a.village,a.state,a.country].filter(Boolean).join(" ");
-        const p={osm_value:x.type,osm_key:x.class,cuisine:x.extratags&&x.extratags.cuisine};
-        items.push({name:nm,lat,lng,address:addr,cat:guessCat(p)});
-      });
-      const seen=new Set();
-      acItems=items.filter(it=>{
-        const k=it.name.toLowerCase()+"|"+it.lat.toFixed(3)+"|"+it.lng.toFixed(3);
-        if(seen.has(k))return false;seen.add(k);return true;
+      const d=await r.json();
+      if(!d.suggestions){acItems=[];renderAC();return;}
+      acItems=d.suggestions.filter(s=>s.placePrediction).map(s=>{
+        const p=s.placePrediction;
+        const main=(p.structuredFormat&&p.structuredFormat.mainText&&p.structuredFormat.mainText.text)||(p.text&&p.text.text)||"";
+        const sec=(p.structuredFormat&&p.structuredFormat.secondaryText&&p.structuredFormat.secondaryText.text)||"";
+        return{name:main,address:sec,placeId:p.placeId,cat:"other"};
       }).slice(0,10);
       renderAC();
     }catch(e){if(e.name!=="AbortError"){acItems=[];renderAC();}}
@@ -999,24 +1010,47 @@
   function renderAC(){
     const ul=document.getElementById("acList");
     const q=document.getElementById("fName").value.trim();
+    const key=EMBED_CFG.gkey;
     if(!acItems.length){
       const gUrl="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);
-      ul.innerHTML='<li class="empty">見つかりません（OSMに未登録の可能性）</li>'+
-        '<li class="gmapEmpty"><a href="'+gUrl+'" target="_blank" rel="noopener">🔍 Google Mapsで「'+esc(q)+'」を探す</a>'+
-        '<div class="hintTiny">→ 出てきた店を「共有→リンクをコピー」→ 上の「📋 貼り付け」で反映</div></li>';
+      if(!key){
+        ul.innerHTML='<li class="empty">Google Places APIキー未設定</li>'+
+          '<li class="gmapEmpty"><a href="'+gUrl+'" target="_blank" rel="noopener">🔍 Google Mapsで「'+esc(q)+'」を探す</a>'+
+          '<div class="hintTiny">→ 出てきた店を「共有→リンクをコピー」→ 上の「📋 貼り付け」で反映</div></li>';
+      }else{
+        ul.innerHTML='<li class="empty">候補が見つかりません</li>'+
+          '<li class="gmapEmpty"><a href="'+gUrl+'" target="_blank" rel="noopener">🔍 Google Mapsで「'+esc(q)+'」を探す</a></li>';
+      }
       ul.classList.add("on");return;
     }
     acHov=-1;
-    ul.innerHTML=acItems.map((it,i)=>{const c=catOf(it.cat);
-      return `<li data-i="${i}"><span class="ico" style="background:${c.color}"></span><div class="txt"><div class="n">${esc(it.name)}</div>${it.address?`<div class="a">${esc(it.address)}</div>`:""}</div></li>`;}).join("");
+    ul.innerHTML=acItems.map((it,i)=>{
+      return `<li data-i="${i}"><span class="ico gpIco"></span><div class="txt"><div class="n">${esc(it.name)}</div>${it.address?`<div class="a">${esc(it.address)}</div>`:""}</div></li>`;}).join("");
     ul.classList.add("on");
     ul.querySelectorAll("li[data-i]").forEach(li=>{li.onclick=()=>pickAC(+li.getAttribute("data-i"));});
   }
-  function pickAC(i){const it=acItems[i];if(!it)return;
+  async function pickAC(i){
+    const it=acItems[i];if(!it)return;
+    const key=EMBED_CFG.gkey;if(!key||!it.placeId){closeAC();return;}
     document.getElementById("fName").value=it.name;
-    setLatLng(it.lat,it.lng);map.setView([it.lat,it.lng],16);
-    if(it.cat&&!form.cats.includes(it.cat))form.cats=[it.cat];
-    refreshCatUI();
+    try{
+      const url="https://places.googleapis.com/v1/places/"+encodeURIComponent(it.placeId)+"?sessionToken="+encodeURIComponent(acSession||"");
+      const r=await fetch(url,{
+        headers:{"X-Goog-Api-Key":key,"X-Goog-FieldMask":"id,displayName,location,formattedAddress,primaryType,types"}
+      });
+      const d=await r.json();
+      if(d.location){
+        setLatLng(d.location.latitude,d.location.longitude);
+        map.setView([d.location.latitude,d.location.longitude],16);
+        const gc=guessCatFromTypes(d.primaryType,d.types||[]);
+        if(gc&&!form.cats.includes(gc))form.cats=[gc];
+        refreshCatUI();
+        if(d.id)form.placeId=d.id;
+      }else{
+        toast("場所の詳細を取得できませんでした");
+      }
+    }catch(e){toast("詳細取得エラー");}
+    newSession();
     closeAC();validate();
   }
   function closeAC(){document.getElementById("acList").classList.remove("on");acItems=[];acHov=-1;}
@@ -1024,7 +1058,7 @@
     if(acTimer)clearTimeout(acTimer);
     const q=document.getElementById("fName").value.trim();
     if(q.length<2){closeAC();return;}
-    acTimer=setTimeout(()=>nameAC(q),320);
+    acTimer=setTimeout(()=>nameAC(q),260);
   }
 
   function getLastReg(){try{return localStorage.getItem(LAST_REG_KEY)||"";}catch(e){return"";}}
@@ -1081,7 +1115,7 @@
       memo:document.getElementById("fMemo").value.trim(),address:"",
       registrant,role:normRole(form.role),
       delivery:!!form.delivery,
-      created_at:new Date().toISOString(),place_id:""};
+      created_at:new Date().toISOString(),place_id:form.placeId||""};
     if(editing){stores=stores.map(s=>s.id===editing?Object.assign({},s,rec):s);saveCache();closeM();render();toast("更新（この端末の表示）。共有シートの修正はシート側で");return;}
     stores.push(rec);saveCache();closeM();render();
     const c=getCfg();
