@@ -148,6 +148,15 @@
   .acList .n{font-family:var(--serif);font-weight:500;font-size:14px;line-height:1.3;color:var(--ink)}
   .acList .a{font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.02em;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .acList .empty{color:var(--ink-3);font-size:12px;text-align:center;padding:12px;font-family:var(--mono);letter-spacing:.04em}
+  .pasteBtn{width:100%;background:var(--brass);color:#fff;font-family:var(--mono);font-size:12px;letter-spacing:.08em;border-radius:5px;padding:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px;border:none;cursor:pointer;line-height:1}
+  .pasteBtn:hover{background:var(--brass-d)}
+  .pasteBtn .ico{font-size:14px}
+  .pasteHint{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);text-align:center;margin:-8px 0 12px;letter-spacing:.02em;line-height:1.5}
+  .detailsTog{background:none;border:none;color:var(--brass-d);font-family:var(--mono);font-size:10px;letter-spacing:.14em;padding:8px 0;cursor:pointer;display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .detailsTog .caret{color:var(--brass);transition:transform .2s}
+  .detailsTog.open .caret{transform:rotate(90deg)}
+  .detailsBox{max-height:0;overflow:hidden;transition:max-height .25s ease}
+  .detailsBox.open{max-height:200px}
   .m-foot{flex:0 0 auto;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);display:flex;gap:10px}
   .m-foot .save{flex:1;background:var(--navy);color:var(--paper);font-family:var(--mono);font-weight:500;letter-spacing:.1em;font-size:12px;border-radius:5px;padding:13px}
   .m-foot .save:disabled{background:var(--line-2);color:var(--paper)}
@@ -226,6 +235,8 @@
 <div class="modal" id="modal">
   <div class="m-head"><span class="grip"></span><h2 id="mTitle">お店を追加</h2><button class="close" id="mClose">✕</button></div>
   <div class="m-body">
+    <button class="pasteBtn" id="pasteFromClip" type="button"><span class="ico">📋</span> クリップボードから貼り付けて反映</button>
+    <div class="pasteHint">Google Maps で「共有 → リンクをコピー」→ ここをタップ</div>
     <div class="fld nameFld">
       <label>店名 / NAME <span class="acHint" id="acHint">— 入力すると候補が出ます</span></label>
       <input type="text" id="fName" placeholder="例：ソンブーン、Tiong Bahru Bakery…" autocomplete="off">
@@ -246,9 +257,12 @@
       <div class="fld"><label>料理 / CATEGORY</label><select id="fCat"></select></div>
     </div>
     <div class="fld"><label>メモ / MEMO</label><textarea id="fMemo" placeholder="🇯🇵24時まで営業、クレジットカードNG、一人でも入りやすい、おすすめは味噌ラーメン など"></textarea></div>
-    <div class="two">
-      <div class="fld"><label>登録者名 / BY（任意）</label><input type="text" id="fReg" placeholder="ニックネーム"></div>
-      <div class="fld"><label>リンク / URL（任意）</label><input type="url" id="fUrl" placeholder="https://…"></div>
+    <button class="detailsTog" id="togDetails" type="button"><span class="caret">▸</span> 詳細（登録者名・URL）</button>
+    <div class="detailsBox" id="detailsBox">
+      <div class="two">
+        <div class="fld"><label>登録者名 / BY</label><input type="text" id="fReg" placeholder="ニックネーム"></div>
+        <div class="fld"><label>リンク / URL</label><input type="url" id="fUrl" placeholder="https://…"></div>
+      </div>
     </div>
   </div>
   <div class="m-foot"><button class="del2" id="mDelete" style="display:none">削除</button><button class="save" id="mSave" disabled>保存する</button></div>
@@ -310,12 +324,12 @@
   //  管理者が設定を再表示したい時は URL の末尾に ?admin=1 を付けてアクセス
   // ============================================================
   const EMBED_CFG = {
-    sheet: "https://docs.google.com/spreadsheets/d/1uiJOgTCVmBA8EuRIWlTxq1QK3mHB-5RbWYi4HJ529Ak/edit?gid=0#gid=0",   // 例: "1AbCd...xyz"（スプレッドシートID）
-    apps:  "https://script.google.com/macros/s/AKfycbwCwEFlrSNgcOzN_Na3OHnhcWntwHgwEWIxMjHgGtva0I5_Akq3a4vuMuxywqyL_FE/exec"    // 例: "https://script.google.com/macros/s/.../exec"
+    sheet: "",   // 例: "1AbCd...xyz"（スプレッドシートID）
+    apps:  ""    // 例: "https://script.google.com/macros/s/.../exec"
   };
   // ============================================================
 
-  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1";
+  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
   const HAS_EMBED=!!(EMBED_CFG.sheet && EMBED_CFG.apps);
 
@@ -528,7 +542,7 @@
     document.getElementById("fCat").innerHTML=CATS.map(c=>`<option value="${c.id}">${esc(c.label)}</option>`).join("");}
   function openAdd(){editing=null;form=blank();if(fRegion!=="ALL")form.region=fRegion;if(fCat!=="ALL")form.cat=fCat;
     document.getElementById("mTitle").textContent="お店を追加";document.getElementById("mDelete").style.display="none";
-    fill({name:"",memo:"",registrant:"",url:""});openM();}
+    fill({name:"",memo:"",registrant:getLastReg(),url:""});openM();}
   function openEdit(id){const s=stores.find(x=>x.id===id);if(!s)return;editing=id;form={region:s.region,cat:s.category,lat:s.lat,lng:s.lng};
     document.getElementById("mTitle").textContent="お店を編集";document.getElementById("mDelete").style.display="";
     fill({name:s.name,memo:s.memo,registrant:s.registrant,url:s.url});openM();}
@@ -538,6 +552,9 @@
     document.getElementById("fMemo").value=s.memo||"";document.getElementById("fReg").value=s.registrant||"";
     document.getElementById("fUrl").value=s.url||"";
     document.getElementById("fSearch").value="";document.getElementById("fGmaps").value="";document.getElementById("geoms").innerHTML="";
+    const hasDetails=!!((s.registrant&&!editing)?false:(s.registrant||s.url));
+    document.getElementById("togDetails").classList.toggle("open",hasDetails);
+    document.getElementById("detailsBox").classList.toggle("open",hasDetails);
     locStatus();validate();if(form.lat!=null)showTemp(form.lat,form.lng);
   }
   function locStatus(){const st=document.getElementById("locStatus");
@@ -583,19 +600,49 @@
   let acAbort=null,acTimer=null,acHov=-1,acItems=[];
   async function nameAC(q){
     if(acAbort)acAbort.abort();acAbort=new AbortController();
+    let bias="",vbox="";
+    try{const c=map.getCenter(),z=map.getZoom();
+      if(z>=6){
+        bias="&lat="+c.lat.toFixed(4)+"&lon="+c.lng.toFixed(4)+"&location_bias_scale=0.6&zoom="+Math.min(z,16);
+        const d=Math.max(0.05,90/Math.pow(2,Math.min(z,14)));
+        vbox="&viewbox="+(c.lng-d).toFixed(4)+","+(c.lat+d).toFixed(4)+","+(c.lng+d).toFixed(4)+","+(c.lat-d).toFixed(4)+"&bounded=0";
+      }
+    }catch(e){}
+    const pURL="https://photon.komoot.io/api/?limit=8&q="+encodeURIComponent(q)+bias;
+    const nURL="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&namedetails=1&extratags=1&limit=8&q="+encodeURIComponent(q)+vbox;
     try{
-      const r=await fetch("https://photon.komoot.io/api/?limit=6&lang=ja&q="+encodeURIComponent(q),{signal:acAbort.signal});
-      const d=await r.json();const feats=(d&&d.features)||[];
-      acItems=feats.filter(f=>f.geometry&&f.geometry.coordinates&&f.properties&&f.properties.name).map(f=>{
+      const [pR,nR]=await Promise.all([
+        fetch(pURL,{signal:acAbort.signal}).then(r=>r.json()).catch(()=>({features:[]})),
+        fetch(nURL,{signal:acAbort.signal,headers:{"Accept":"application/json"}}).then(r=>r.json()).catch(()=>[])
+      ]);
+      const items=[];
+      ((pR&&pR.features)||[]).forEach(f=>{
+        if(!f.geometry||!f.geometry.coordinates||!f.properties||!f.properties.name)return;
         const p=f.properties,co=f.geometry.coordinates;
-        return{name:p.name,lat:co[1],lng:co[0],address:addrOf(p),cat:guessCat(p)};
+        items.push({name:p.name,lat:co[1],lng:co[0],address:addrOf(p),cat:guessCat(p)});
       });
+      (Array.isArray(nR)?nR:[]).forEach(x=>{
+        const nd=x.namedetails||{};
+        const nm=nd["name:ja"]||nd["name:en"]||nd.name||(x.display_name&&x.display_name.split(",")[0].trim())||"";
+        if(!nm)return;
+        const lat=parseFloat(x.lat),lng=parseFloat(x.lon);
+        if(isNaN(lat)||isNaN(lng))return;
+        const a=x.address||{};
+        const addr=[a.house_number,a.road,a.neighbourhood,a.suburb,a.city||a.town||a.village,a.state,a.country].filter(Boolean).join(" ");
+        const p={osm_value:x.type,osm_key:x.class,cuisine:x.extratags&&x.extratags.cuisine};
+        items.push({name:nm,lat,lng,address:addr,cat:guessCat(p)});
+      });
+      const seen=new Set();
+      acItems=items.filter(it=>{
+        const k=it.name.toLowerCase()+"|"+it.lat.toFixed(3)+"|"+it.lng.toFixed(3);
+        if(seen.has(k))return false;seen.add(k);return true;
+      }).slice(0,10);
       renderAC();
     }catch(e){if(e.name!=="AbortError"){acItems=[];renderAC();}}
   }
   function renderAC(){
     const ul=document.getElementById("acList");
-    if(!acItems.length){ul.innerHTML='<li class="empty">該当なし</li>';ul.classList.add("on");return;}
+    if(!acItems.length){ul.innerHTML='<li class="empty">見つかりません — 英語/現地語で試すか、下の「住所検索」か「GMapリンク貼付」で位置指定してください</li>';ul.classList.add("on");return;}
     acHov=-1;
     ul.innerHTML=acItems.map((it,i)=>{const c=catOf(it.cat);
       return `<li data-i="${i}"><span class="ico" style="background:${c.color}">${GLY[c.id]||"他"}</span><div class="txt"><div class="n">${esc(it.name)}</div>${it.address?`<div class="a">${esc(it.address)}</div>`:""}</div></li>`;}).join("");
@@ -613,7 +660,37 @@
     if(acTimer)clearTimeout(acTimer);
     const q=document.getElementById("fName").value.trim();
     if(q.length<2){closeAC();return;}
-    acTimer=setTimeout(()=>nameAC(q),280);
+    acTimer=setTimeout(()=>nameAC(q),320);
+  }
+
+  function getLastReg(){try{return localStorage.getItem(LAST_REG_KEY)||"";}catch(e){return"";}}
+  function saveLastReg(v){try{if(v)localStorage.setItem(LAST_REG_KEY,v);}catch(e){}}
+
+  async function pasteFromClip(){
+    let txt="";
+    try{if(navigator.clipboard&&navigator.clipboard.readText){txt=await navigator.clipboard.readText();}}
+    catch(e){toast("貼り付けを許可してください（ブラウザ設定）");return;}
+    if(!txt||!txt.trim()){toast("クリップボードが空です");return;}
+    const s=txt.trim();
+    const res=parseGmaps(s);
+    if(res){
+      if(res.short){toast("短縮リンクは開いて完全URLをコピーしてください");return;}
+      if(res.lat!=null){
+        setLatLng(res.lat,res.lng);map.setView([res.lat,res.lng],16);
+        const n=document.getElementById("fName");
+        if(res.name&&!n.value.trim()){n.value=res.name;scheduleAC();}
+        validate();toast(res.name?"位置と店名を反映":"位置を反映");
+        return;
+      }
+      if(res.name){
+        const n=document.getElementById("fName");if(!n.value.trim())n.value=res.name;
+        scheduleAC();validate();toast("店名を反映（位置は下で指定してください）");return;
+      }
+    }
+    if(s.length<80){
+      const n=document.getElementById("fName");n.value=s;scheduleAC();validate();
+      toast("店名として貼り付け");
+    }else toast("Google Maps URLを検出できませんでした");
   }
   function acKey(e){
     const ul=document.getElementById("acList");if(!ul.classList.contains("on")||!acItems.length)return;
@@ -628,9 +705,11 @@
   function validate(){document.getElementById("mSave").disabled=!(document.getElementById("fName").value.trim()&&form.lat!=null);}
   async function saveSpot(){
     const name=document.getElementById("fName").value.trim();if(!name||form.lat==null)return;
+    const registrant=document.getElementById("fReg").value.trim();
+    if(registrant)saveLastReg(registrant);
     const rec={id:editing||uid(),name,category:document.getElementById("fCat").value,region:document.getElementById("fRegion").value,
       lat:form.lat,lng:form.lng,memo:document.getElementById("fMemo").value.trim(),address:"",
-      registrant:document.getElementById("fReg").value.trim(),
+      registrant,
       created_at:new Date().toISOString(),place_id:"",url:document.getElementById("fUrl").value.trim()};
     if(editing){stores=stores.map(s=>s.id===editing?Object.assign({},s,rec):s);saveCache();closeM();render();toast("更新（この端末の表示）。共有シートの修正はシート側で");return;}
     stores.push(rec);saveCache();closeM();render();
@@ -688,6 +767,11 @@
     document.getElementById("mClose").onclick=closeM;scrim.onclick=closeM;
     document.getElementById("mSave").onclick=saveSpot;
     document.getElementById("mDelete").onclick=()=>{if(editing&&confirm("この店を削除しますか？")){delSpot(editing);closeM();}};
+    document.getElementById("pasteFromClip").onclick=pasteFromClip;
+    document.getElementById("togDetails").onclick=()=>{
+      document.getElementById("togDetails").classList.toggle("open");
+      document.getElementById("detailsBox").classList.toggle("open");
+    };
     document.getElementById("fName").addEventListener("input",()=>{validate();scheduleAC();});
     document.getElementById("fName").addEventListener("keydown",acKey);
     document.getElementById("fName").addEventListener("blur",()=>setTimeout(closeAC,180));
