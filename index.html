@@ -95,9 +95,12 @@
 
   .fab{position:absolute;right:16px;bottom:16px;z-index:600;background:var(--brass);color:#fff;font-family:var(--mono);font-weight:500;letter-spacing:.06em;font-size:12px;border-radius:30px;padding:12px 17px;box-shadow:0 5px 16px rgba(169,139,93,.5);display:none;align-items:center;gap:6px}
 
-  .sheet{flex:0 0 var(--sheet);background:var(--paper);border-top:1px solid var(--line);display:flex;flex-direction:column;min-height:0;box-shadow:0 -4px 16px rgba(20,31,43,.06)}
-  .sheet-head{flex:0 0 auto;padding:8px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink-3);display:flex;align-items:center;gap:8px}
-  .sheet-head .grab{margin-left:auto;color:var(--brass)}
+  .sheet{flex:0 0 var(--sheet);background:var(--paper);border-top:1px solid var(--line);display:flex;flex-direction:column;min-height:0;box-shadow:0 -4px 16px rgba(20,31,43,.06);transition:flex .25s ease}
+  .sheet-head{flex:0 0 auto;padding:8px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink-3);display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-user-select:none;user-select:none}
+  .sheet-head .grab{margin-left:auto;color:var(--brass);transition:transform .2s}
+  .sheet.collapsed{flex:0 0 32px;min-height:32px}
+  .sheet.collapsed .list{display:none}
+  .sheet.collapsed .sheet-head .grab{transform:rotate(180deg)}
   .list{flex:1 1 auto;overflow-y:auto;padding:6px 0 16px;-webkit-overflow-scrolling:touch}
   .item{display:flex;gap:11px;padding:11px 15px;border-bottom:1px solid var(--paper-2);cursor:pointer;transition:background .12s}
   .item:hover{background:var(--paper-2)}
@@ -259,7 +262,7 @@
 <div class="work">
   <div class="stage"><div id="map"></div><button class="fab" id="fab"><span style="color:#fff">＋</span> 追加</button></div>
   <div class="sheet">
-    <div class="sheet-head"><span id="sheetTitle">すべての一覧</span><span class="grab">◍ 一覧</span></div>
+    <div class="sheet-head" id="sheetHead"><span id="sheetTitle">すべての一覧</span><span class="grab" id="sheetGrab">▾ 一覧</span></div>
     <div class="list" id="list"></div>
   </div>
 </div>
@@ -828,7 +831,8 @@
           registrant:g(row,"registrant"),role:normRole(g(row,"role")),delivery:normBool(g(row,"delivery")),
           created_at:g(row,"created_at"),place_id:g(row,"place_id")});}
       const sids=new Set(server.map(s=>s.id));
-      const keep=stores.filter(s=>!s._sample&&!sids.has(s.id));
+      server.forEach(s=>{s._synced=true;});
+      const keep=stores.filter(s=>!s._sample&&!s._synced&&!sids.has(s.id));
       stores=server.concat(keep);saveCache();render();
       if(!silent)toast(server.length+" 軒を同期しました");
     }catch(e){if(!silent)toast("同期できません（共有設定 / URLを確認）");}
@@ -1202,7 +1206,42 @@
     document.getElementById("btnToggleF").onclick=()=>{filtersOpen=!filtersOpen;
       document.getElementById("filters").classList.toggle("collapsed",!filtersOpen);
       document.getElementById("btnToggleF").classList.toggle("collapsed",!filtersOpen);
-      document.getElementById("btnToggleF").childNodes[0].nodeValue=filtersOpen?"フィルターを隠す ":"フィルターを表示 ";};
+      document.getElementById("btnToggleF").childNodes[0].nodeValue=filtersOpen?"フィルターを隠す ":"フィルターを表示 ";
+      map.invalidateSize();};
+    // Sheet (list) toggle
+    let sheetOpen=true;
+    function toggleSheet(){
+      sheetOpen=!sheetOpen;
+      document.querySelector(".sheet").classList.toggle("collapsed",!sheetOpen);
+      document.getElementById("sheetGrab").textContent=sheetOpen?"▾ 一覧":"▴ 一覧";
+      map.invalidateSize();
+    }
+    document.getElementById("sheetHead").onclick=toggleSheet;
+    // Swipe on sheet head
+    (function(){
+      const sh=document.getElementById("sheetHead");
+      let sy=0;
+      sh.addEventListener("touchstart",e=>{sy=e.touches[0].clientY;},{passive:true});
+      sh.addEventListener("touchend",e=>{
+        const dy=e.changedTouches[0].clientY-sy;
+        if(Math.abs(dy)>30){
+          if(dy<0&&!sheetOpen)toggleSheet(); // swipe up = open
+          if(dy>0&&sheetOpen)toggleSheet();   // swipe down = close
+        }
+      },{passive:true});
+    })();
+    // Swipe on filters
+    (function(){
+      const fl=document.getElementById("filters");
+      let sy=0;
+      fl.addEventListener("touchstart",e=>{sy=e.touches[0].clientY;},{passive:true});
+      fl.addEventListener("touchend",e=>{
+        const dy=e.changedTouches[0].clientY-sy;
+        if(dy>40&&filtersOpen){
+          document.getElementById("btnToggleF").click(); // swipe down = close
+        }
+      },{passive:true});
+    })();
     document.getElementById("btnSettings").onclick=openSet;document.getElementById("setClose").onclick=closeSet;scrim2.onclick=closeSet;
     document.getElementById("cfgSave").onclick=()=>{setCfg({sheet:document.getElementById("cfgSheet").value.trim(),apps:document.getElementById("cfgApps").value.trim()});
       updateSync();toast("保存しました");syncFromSheet(false);};
