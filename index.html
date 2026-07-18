@@ -831,11 +831,9 @@
           registrant:g(row,"registrant"),role:normRole(g(row,"role")),delivery:normBool(g(row,"delivery")),
           created_at:g(row,"created_at"),place_id:g(row,"place_id")});}
       const sids=new Set(server.map(s=>s.id));
-      server.forEach(s=>{s._synced=true;});
-      const keep=stores.filter(s=>!s._sample&&!s._synced&&!sids.has(s.id));
+      const keep=stores.filter(s=>s._local&&!sids.has(s.id));
       stores=server.concat(keep);saveCache();render();
-      if(!silent){const removed=keep.length<stores.filter(s=>!s._sample&&!sids.has(s.id)).length;
-        toast(server.length+" 軒を同期しました");}
+      if(!silent)toast(server.length+" 軒を同期しました");
     }catch(e){if(!silent)toast("同期できません（共有設定 / URLを確認）");}
     updateSync();
   }
@@ -846,7 +844,7 @@
       delivery:rec.delivery?"1":"",
       role:normRole(rec.role)
     });
-    delete payload.categories;delete payload._sample;
+    delete payload.categories;delete payload._sample;delete payload._local;delete payload._synced;
     try{await fetch(c.apps,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});return{persisted:true};}
     catch(e){return{persisted:false};}
   }
@@ -1124,10 +1122,11 @@
       delivery:!!form.delivery,
       created_at:new Date().toISOString(),place_id:form.placeId||""};
     if(editing){stores=stores.map(s=>s.id===editing?Object.assign({},s,rec):s);saveCache();closeM();render();toast("更新（この端末の表示）。共有シートの修正はシート側で");return;}
+    rec._local=true;
     stores.push(rec);saveCache();closeM();render();
     const c=getCfg();
     if(c.apps){toast("追加中…みんなのシートに書き込み");const res=await pushToSheet(rec);
-      if(res.persisted){rec._synced=true;saveCache();}
+      if(res.persisted){delete rec._local;saveCache();}
       toast(res.persisted?"追加しました（共有）":"追加（この端末）。同期は後ほど");setTimeout(()=>syncFromSheet(true),3500);}
     else toast("追加しました（この端末のみ・設定で共同編集を有効化）");
   }
