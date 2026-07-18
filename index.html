@@ -136,6 +136,18 @@
   .geoms{list-style:none;margin:7px 0 0;padding:0;max-height:118px;overflow-y:auto}
   .geoms li{font-size:12px;padding:7px 8px;border:1px solid var(--line);border-radius:4px;margin-bottom:5px;cursor:pointer;color:var(--ink-2);background:var(--paper)}
   .geoms li:hover{border-color:var(--brass)}
+  .nameFld{position:relative}
+  .acHint{font-family:var(--mono);font-size:9px;color:var(--ink-3);letter-spacing:.02em;font-weight:400;text-transform:none}
+  .acList{list-style:none;margin:0;padding:0;position:absolute;top:100%;left:0;right:0;background:var(--paper);border:1px solid var(--line-2);border-radius:4px;box-shadow:0 6px 20px rgba(20,31,43,.15);max-height:260px;overflow-y:auto;z-index:20;display:none;margin-top:2px}
+  .acList.on{display:block}
+  .acList li{padding:9px 11px;cursor:pointer;border-bottom:1px solid var(--paper-2);display:flex;align-items:flex-start;gap:9px}
+  .acList li:last-child{border-bottom:none}
+  .acList li:hover,.acList li.hov{background:var(--paper-2)}
+  .acList .ico{flex:0 0 auto;width:22px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--serif);font-size:11px;font-weight:600;margin-top:1px}
+  .acList .txt{min-width:0;flex:1}
+  .acList .n{font-family:var(--serif);font-weight:500;font-size:14px;line-height:1.3;color:var(--ink)}
+  .acList .a{font-family:var(--mono);font-size:10px;color:var(--ink-3);letter-spacing:.02em;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .acList .empty{color:var(--ink-3);font-size:12px;text-align:center;padding:12px;font-family:var(--mono);letter-spacing:.04em}
   .m-foot{flex:0 0 auto;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);display:flex;gap:10px}
   .m-foot .save{flex:1;background:var(--navy);color:var(--paper);font-family:var(--mono);font-weight:500;letter-spacing:.1em;font-size:12px;border-radius:5px;padding:13px}
   .m-foot .save:disabled{background:var(--line-2);color:var(--paper)}
@@ -214,7 +226,11 @@
 <div class="modal" id="modal">
   <div class="m-head"><span class="grip"></span><h2 id="mTitle">お店を追加</h2><button class="close" id="mClose">✕</button></div>
   <div class="m-body">
-    <div class="fld"><label>店名 / NAME</label><input type="text" id="fName" placeholder="例：ソンブーン、Tiong Bahru Bakery…"></div>
+    <div class="fld nameFld">
+      <label>店名 / NAME <span class="acHint" id="acHint">— 入力すると候補が出ます</span></label>
+      <input type="text" id="fName" placeholder="例：ソンブーン、Tiong Bahru Bakery…" autocomplete="off">
+      <ul class="acList" id="acList"></ul>
+    </div>
     <div class="fld">
       <label>位置 / LOCATION</label>
       <div class="loc">
@@ -288,7 +304,20 @@
 <script>
 (function(){
   "use strict";
+
+  // ============================================================
+  //  接続情報を埋め込むならここに書く（両方セットで全端末が共同編集モードで起動）
+  //  管理者が設定を再表示したい時は URL の末尾に ?admin=1 を付けてアクセス
+  // ============================================================
+  const EMBED_CFG = {
+    sheet: "",   // 例: "1AbCd...xyz"（スプレッドシートID）
+    apps:  ""    // 例: "https://script.google.com/macros/s/.../exec"
+  };
+  // ============================================================
+
   const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1";
+  const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
+  const HAS_EMBED=!!(EMBED_CFG.sheet && EMBED_CFG.apps);
 
   const CATS=[
     {id:"ramen",label:"ラーメン",color:"#B5654A"},
@@ -341,7 +370,7 @@
   let form=blank();
   function blank(){return{region:"thailand",cat:"cafe_sweets",lat:null,lng:null};}
 
-  function getCfg(){try{return JSON.parse(localStorage.getItem(CFG_KEY))||{};}catch(e){return{};}}
+  function getCfg(){if(HAS_EMBED)return{sheet:EMBED_CFG.sheet,apps:EMBED_CFG.apps};try{return JSON.parse(localStorage.getItem(CFG_KEY))||{};}catch(e){return{};}}
   function setCfg(c){try{localStorage.setItem(CFG_KEY,JSON.stringify(c));}catch(e){}}
   function csvUrl(){const c=getCfg();if(!c.sheet)return null;
     if(/^https?:/i.test(c.sheet))return c.sheet;
@@ -494,7 +523,7 @@
 
   const scrim=document.getElementById("scrim"),modal=document.getElementById("modal");
   function openM(){scrim.classList.add("on");modal.classList.add("on");}
-  function closeM(){scrim.classList.remove("on");modal.classList.remove("on");disarm();clearTemp();document.getElementById("geoms").innerHTML="";}
+  function closeM(){scrim.classList.remove("on");modal.classList.remove("on");disarm();clearTemp();document.getElementById("geoms").innerHTML="";closeAC();}
   function fillSelects(){document.getElementById("fRegion").innerHTML=REGIONS.map(r=>`<option value="${r.id}">${esc(r.label)} · ${r.code}</option>`).join("");
     document.getElementById("fCat").innerHTML=CATS.map(c=>`<option value="${c.id}">${esc(c.label)}</option>`).join("");}
   function openAdd(){editing=null;form=blank();if(fRegion!=="ALL")form.region=fRegion;if(fCat!=="ALL")form.cat=fCat;
@@ -540,6 +569,61 @@
     if(res.lat==null){toast("座標が見つかりません（@lat,lng を含むURLを）");return;}
     setLatLng(res.lat,res.lng);map.setView([res.lat,res.lng],16);
     const n=document.getElementById("fName");if(res.name&&!n.value.trim())n.value=res.name;validate();inp.value="";}
+
+  // ---- 店名オートコンプリート（Photon = OSM ベース、無料・CORS・カード不要） ----
+  const CUISINE_MAP={ramen:"ramen",noodle:"ramen",sushi:"sushi_seafood",seafood:"sushi_seafood",japanese:"washoku",washoku:"washoku",kaiseki:"washoku",izakaya:"bar",yakitori:"washoku",french:"yoshoku",italian:"yoshoku",western:"yoshoku",bistro:"yoshoku",steak:"yoshoku",coffee:"cafe_sweets",cafe:"cafe_sweets",tea:"cafe_sweets",bakery:"cafe_sweets",dessert:"cafe_sweets",ice_cream:"cafe_sweets",thai:"asian",vietnamese:"asian",chinese:"asian",korean:"asian",indian:"asian",asian:"asian"};
+  const OSMV_MAP={cafe:"cafe_sweets",bar:"bar",pub:"bar",biergarten:"bar",nightclub:"bar",ice_cream:"cafe_sweets",bakery:"cafe_sweets",confectionery:"cafe_sweets",fast_food:"other",restaurant:"other",food_court:"other"};
+  function guessCat(p){
+    if(p.cuisine){for(const c of String(p.cuisine).toLowerCase().split(/[;, ]/)){if(CUISINE_MAP[c])return CUISINE_MAP[c];}}
+    if(p.osm_value&&OSMV_MAP[p.osm_value])return OSMV_MAP[p.osm_value];
+    return"other";
+  }
+  function addrOf(p){return[p.housenumber,p.street,p.district,p.city||p.county,p.state,p.country].filter(Boolean).join(" ");}
+
+  let acAbort=null,acTimer=null,acHov=-1,acItems=[];
+  async function nameAC(q){
+    if(acAbort)acAbort.abort();acAbort=new AbortController();
+    try{
+      const r=await fetch("https://photon.komoot.io/api/?limit=6&lang=ja&q="+encodeURIComponent(q),{signal:acAbort.signal});
+      const d=await r.json();const feats=(d&&d.features)||[];
+      acItems=feats.filter(f=>f.geometry&&f.geometry.coordinates&&f.properties&&f.properties.name).map(f=>{
+        const p=f.properties,co=f.geometry.coordinates;
+        return{name:p.name,lat:co[1],lng:co[0],address:addrOf(p),cat:guessCat(p)};
+      });
+      renderAC();
+    }catch(e){if(e.name!=="AbortError"){acItems=[];renderAC();}}
+  }
+  function renderAC(){
+    const ul=document.getElementById("acList");
+    if(!acItems.length){ul.innerHTML='<li class="empty">該当なし</li>';ul.classList.add("on");return;}
+    acHov=-1;
+    ul.innerHTML=acItems.map((it,i)=>{const c=catOf(it.cat);
+      return `<li data-i="${i}"><span class="ico" style="background:${c.color}">${GLY[c.id]||"他"}</span><div class="txt"><div class="n">${esc(it.name)}</div>${it.address?`<div class="a">${esc(it.address)}</div>`:""}</div></li>`;}).join("");
+    ul.classList.add("on");
+    ul.querySelectorAll("li[data-i]").forEach(li=>{li.onclick=()=>pickAC(+li.getAttribute("data-i"));});
+  }
+  function pickAC(i){const it=acItems[i];if(!it)return;
+    document.getElementById("fName").value=it.name;
+    setLatLng(it.lat,it.lng);map.setView([it.lat,it.lng],16);
+    document.getElementById("fCat").value=it.cat;form.cat=it.cat;
+    closeAC();validate();
+  }
+  function closeAC(){document.getElementById("acList").classList.remove("on");acItems=[];acHov=-1;}
+  function scheduleAC(){
+    if(acTimer)clearTimeout(acTimer);
+    const q=document.getElementById("fName").value.trim();
+    if(q.length<2){closeAC();return;}
+    acTimer=setTimeout(()=>nameAC(q),280);
+  }
+  function acKey(e){
+    const ul=document.getElementById("acList");if(!ul.classList.contains("on")||!acItems.length)return;
+    if(e.key==="ArrowDown"){e.preventDefault();acHov=Math.min(acItems.length-1,acHov+1);updHov();}
+    else if(e.key==="ArrowUp"){e.preventDefault();acHov=Math.max(0,acHov-1);updHov();}
+    else if(e.key==="Enter"&&acHov>=0){e.preventDefault();pickAC(acHov);}
+    else if(e.key==="Escape"){closeAC();}
+  }
+  function updHov(){document.querySelectorAll("#acList li[data-i]").forEach((li,i)=>li.classList.toggle("hov",i===acHov));
+    const el=document.querySelector("#acList li.hov");if(el)el.scrollIntoView({block:"nearest"});}
 
   function validate(){document.getElementById("mSave").disabled=!(document.getElementById("fName").value.trim()&&form.lat!=null);}
   async function saveSpot(){
@@ -604,7 +688,10 @@
     document.getElementById("mClose").onclick=closeM;scrim.onclick=closeM;
     document.getElementById("mSave").onclick=saveSpot;
     document.getElementById("mDelete").onclick=()=>{if(editing&&confirm("この店を削除しますか？")){delSpot(editing);closeM();}};
-    document.getElementById("fName").addEventListener("input",validate);
+    document.getElementById("fName").addEventListener("input",()=>{validate();scheduleAC();});
+    document.getElementById("fName").addEventListener("keydown",acKey);
+    document.getElementById("fName").addEventListener("blur",()=>setTimeout(closeAC,180));
+    document.getElementById("fName").addEventListener("focus",()=>{if(document.getElementById("fName").value.trim().length>=2)scheduleAC();});
     document.getElementById("fRegion").addEventListener("change",e=>form.region=e.target.value);
     document.getElementById("fCat").addEventListener("change",e=>form.cat=e.target.value);
     document.getElementById("locTap").onclick=()=>{tapArmed?disarm():arm();};
@@ -632,6 +719,7 @@
   }
 
   fillSelects();initMap();wire();render();updateSync();
+  if(HAS_EMBED&&!IS_ADMIN){document.getElementById("btnSettings").style.display="none";}
   if(stores.length){const p=stores.map(s=>[s.lat,s.lng]);try{map.fitBounds(p,{padding:[50,50],maxZoom:11});}catch(e){}}
   if(csvUrl())syncFromSheet(true);
   setTimeout(()=>document.getElementById("splash").classList.add("gone"),900);
