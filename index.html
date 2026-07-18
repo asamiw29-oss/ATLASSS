@@ -714,14 +714,16 @@
     const catBadges=cats.map(cid=>{const c=catOf(cid);return `<span class="cb" style="background:${c.color}22;color:${c.color};border:1px solid ${c.color}66">${esc(c.label)}</span>`;}).join(" ");
     const roleHtml=s.role?`<span class="rIco r-${s.role}" title="${s.role==="pilot"?"Pilot":"CA"}">${roleIcon(s.role)}</span>`:"";
     const delHtml=s.delivery?`<span class="delBadge" title="デリバリー対応">🛵 デリバリー可</span>`:"";
+    const gmapQ=s.place_id?`place_id:${encodeURIComponent(s.place_id)}`:encodeURIComponent(s.name+" "+a.city);
+    const destQ=s.place_id?`place_id:${encodeURIComponent(s.place_id)}`:encodeURIComponent(s.name);
     return `<div class="pop" data-id="${esc(s.id)}"><h3>${esc(s.name)}</h3>
       <div class="meta">${catBadges}</div>
       <div class="meta2">${esc(a.city)} <span class="code">${esc(a.code)}</span>${delHtml?" · "+delHtml:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}
       ${(s.registrant||s.role)?`<div class="reg">${roleHtml}${s.registrant?"<span>— "+esc(s.registrant)+"</span>":""}</div>`:""}
       <div class="row">
-        <a class="gm" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank" rel="noopener">▷ 経路</a>
-        <a class="gm" href="https://www.google.com/maps/search/?api=1&query=${s.lat},${s.lng}" target="_blank" rel="noopener">◉ GMap</a>
+        <a class="gm" href="https://www.google.com/maps/dir/?api=1&destination=${destQ}&destination_place_id=${encodeURIComponent(s.place_id||"")}" target="_blank" rel="noopener">▷ 経路</a>
+        <a class="gm" href="https://www.google.com/maps/search/?api=1&query=${gmapQ}" target="_blank" rel="noopener">◉ GMap</a>
         <button data-act="edit">編集</button><button data-act="del" class="del">削除</button>
       </div></div>`;}
   function bindPop(id){const el=document.querySelector(`.pop[data-id="${cssq(id)}"]`);if(!el)return;
