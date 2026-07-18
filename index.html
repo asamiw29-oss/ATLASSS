@@ -834,7 +834,8 @@
       server.forEach(s=>{s._synced=true;});
       const keep=stores.filter(s=>!s._sample&&!s._synced&&!sids.has(s.id));
       stores=server.concat(keep);saveCache();render();
-      if(!silent)toast(server.length+" 軒を同期しました");
+      if(!silent){const removed=keep.length<stores.filter(s=>!s._sample&&!sids.has(s.id)).length;
+        toast(server.length+" 軒を同期しました");}
     }catch(e){if(!silent)toast("同期できません（共有設定 / URLを確認）");}
     updateSync();
   }
@@ -1126,6 +1127,7 @@
     stores.push(rec);saveCache();closeM();render();
     const c=getCfg();
     if(c.apps){toast("追加中…みんなのシートに書き込み");const res=await pushToSheet(rec);
+      if(res.persisted){rec._synced=true;saveCache();}
       toast(res.persisted?"追加しました（共有）":"追加（この端末）。同期は後ほど");setTimeout(()=>syncFromSheet(true),3500);}
     else toast("追加しました（この端末のみ・設定で共同編集を有効化）");
   }
