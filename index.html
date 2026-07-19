@@ -11,6 +11,11 @@
 <meta name="description" content="世界の上質な一軒を巡る、共同編集グルメマップ。">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Atlas Layover">
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
+<link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossorigin>
+<link rel="preconnect" href="https://c.basemaps.cartocdn.com" crossorigin>
+<link rel="preconnect" href="https://d.basemaps.cartocdn.com" crossorigin>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -246,10 +251,10 @@
 
 <div class="actions">
   <button class="add" id="btnAdd"><span class="p">＋</span> お店を追加</button>
-  <button class="togglef" id="btnToggleF">フィルターを隠す <span class="caret">▴</span></button>
+  <button class="togglef collapsed" id="btnToggleF">フィルターを表示 <span class="caret">▴</span></button>
 </div>
 
-<div class="filters" id="filters">
+<div class="filters collapsed" id="filters">
   <div class="fscroll">
     <div class="fgroup"><div class="flabel">エリア / MACRO</div><div class="chips" id="macroChips"></div></div>
     <div class="fgroup"><div class="flabel">空港 / AIRPORT</div><div class="chips" id="airportChips"></div></div>
@@ -653,7 +658,7 @@
   }
 
   let stores=loadCache();
-  let fMacro="ALL",fAirport="ALL",fCat="ALL",filtersOpen=true;
+  let fMacro="ALL",fAirport="ALL",fCat="ALL",filtersOpen=false;
   let map,layer,markers=[],temp=null,tapArmed=false,editing=null,zoomLabels=false;
   let form=blank();
   function blank(){return{region:"BKK",cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:""};}
@@ -1258,7 +1263,7 @@
 
   fillSelects();initMap();wire();render();updateSync();
   if(HAS_EMBED&&!IS_ADMIN){document.getElementById("btnSettings").style.display="none";}
-  if(stores.length){const p=stores.map(s=>[s.lat,s.lng]);try{map.fitBounds(p,{padding:[50,50],maxZoom:11});}catch(e){}}
+  if(stores.length){const p=stores.map(s=>[s.lat,s.lng]);try{map.fitBounds(p,{padding:[50,50],maxZoom:5});}catch(e){}}
   if(csvUrl())syncFromSheet(true);
   setTimeout(()=>document.getElementById("splash").classList.add("gone"),900);
 })();
