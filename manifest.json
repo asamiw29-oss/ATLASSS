@@ -1,0 +1,13 @@
+{
+  "name": "Atlas — Layover Map",
+  "short_name": "Atlas",
+  "description": "世界の上質な一軒を巡る、共同編集グルメマップ。",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1C2A3A",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
