@@ -749,9 +749,17 @@
   });}
   function countMacro(id){return stores.filter(s=>airOf(s.region).macro===id).length;}
   function countAir(code){return stores.filter(s=>s.region===code).length;}
-  function countCat(id){return stores.filter(s=>(s.categories||[]).includes(id)).length;}
+  // Stores within the current macro/airport scope (ignoring the category filter)
+  function scopeStores(){return stores.filter(s=>{
+    if(fMacro!=="ALL"&&airOf(s.region).macro!==fMacro)return false;
+    if(fAirport!=="ALL"&&s.region!==fAirport)return false;
+    return true;
+  });}
+  function countCat(id){return scopeStores().filter(s=>(s.categories||[]).includes(id)).length;}
 
   function render(){
+    // If the selected category no longer exists in the current scope, reset it
+    if(fCat!=="ALL"&&countCat(fCat)===0)fCat="ALL";
     document.getElementById("cTotal").textContent=stores.length;
     document.getElementById("cShown").textContent=filtered().length;
     renderChips();renderList();renderMarkers();
@@ -774,10 +782,12 @@
         if(fAirport===a.code){fAirport="ALL";}else{fAirport=a.code;fMacro=a.macro;}
         render();fitFilter();
       },n===0));});
-    // CATEGORY row
+    // CATEGORY row — only show categories present in the current macro/airport scope
     const cw=document.getElementById("catChips");cw.innerHTML="";
-    cw.appendChild(chip("すべて",null,stores.length,fCat==="ALL",null,()=>{fCat="ALL";render();}));
-    CATS.forEach(c=>{const n=countCat(c.id);cw.appendChild(chip(c.label,null,n,fCat===c.id,c.color,()=>{fCat=(fCat===c.id?"ALL":c.id);render();},n===0));});
+    const scopeTotal=scopeStores().length;
+    cw.appendChild(chip("すべて",null,scopeTotal,fCat==="ALL",null,()=>{fCat="ALL";render();}));
+    CATS.forEach(c=>{const n=countCat(c.id);if(n===0&&fCat!==c.id)return;
+      cw.appendChild(chip(c.label,null,n,fCat===c.id,c.color,()=>{fCat=(fCat===c.id?"ALL":c.id);render();},false));});
     // Sheet head
     const parts=[];
     if(fAirport!=="ALL")parts.push(fAirport+" "+airOf(fAirport).city);
