@@ -224,11 +224,11 @@
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
   input[type=file]{display:none}
 
-  .splash{position:fixed;inset:0;background:var(--navy);z-index:3000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:opacity .5s}
+  .splash{position:fixed;inset:0;background:var(--navy);z-index:3000;display:flex;align-items:center;justify-content:center;transition:opacity .55s ease}
   .splash.gone{opacity:0;pointer-events:none}
-  .splash .a{font-family:var(--serif);font-weight:600;font-size:44px;color:var(--paper);letter-spacing:.03em;animation:rise .7s cubic-bezier(.2,.8,.2,1)}
-  .splash .g{font-family:var(--mono);font-size:10px;letter-spacing:.4em;color:#9fb0c2}
-  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  .splash img{width:min(64vw,320px);height:auto;animation:logoIn .7s cubic-bezier(.2,.8,.2,1);transition:transform .55s ease}
+  .splash.gone img{transform:scale(1.09)}
+  @keyframes logoIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
 
   @media(min-width:820px){
     :root{--sheet:0px}
@@ -241,7 +241,7 @@
 </head>
 <body>
 
-<div class="splash" id="splash"><div class="a">Atlas</div><div class="g">LAYOVER&nbsp;MAP</div></div>
+<div class="splash" id="splash"><img src="splash-logo-white.png" alt="Atlas — Layover Map"></div>
 
 <header>
   <div class="brand" id="brand"><span class="a">Atlas</span><span class="g">LAYOVER&nbsp;MAP</span></div>
@@ -1268,7 +1268,7 @@
   if(HAS_EMBED&&!IS_ADMIN){document.getElementById("btnSettings").style.display="none";}
   if(stores.length){const p=stores.map(s=>[s.lat,s.lng]);try{map.fitBounds(p,{padding:[50,50],maxZoom:5});}catch(e){}}
   if(csvUrl())syncFromSheet(true);
-  setTimeout(()=>document.getElementById("splash").classList.add("gone"),900);
+  setTimeout(()=>document.getElementById("splash").classList.add("gone"),1200);
 })();
 </script>
 </body>
