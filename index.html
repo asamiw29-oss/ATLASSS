@@ -60,6 +60,7 @@
 
   .filters{flex:0 0 auto;background:var(--paper);border-bottom:1px solid var(--line);overflow:hidden;transition:max-height .25s ease;max-height:360px}
   .filters.collapsed{max-height:0;border-bottom:none}
+  .filters.dragging{transition:none}
   .fscroll{max-height:360px;overflow-y:auto;padding:12px 14px 14px}
   .fgroup+.fgroup{margin-top:14px}
   .flabel{font-family:var(--mono);font-size:10px;letter-spacing:.22em;color:var(--brass-d);display:flex;align-items:center;gap:8px;margin-bottom:9px}
@@ -104,8 +105,10 @@
   .fab{position:absolute;right:16px;bottom:16px;z-index:600;background:var(--brass);color:#fff;font-family:var(--mono);font-weight:500;letter-spacing:.06em;font-size:12px;border-radius:30px;padding:12px 17px;box-shadow:0 5px 16px rgba(169,139,93,.5);display:none;align-items:center;gap:6px}
 
   .sheet{flex:0 0 var(--sheet);background:var(--paper);border-top:1px solid var(--line);display:flex;flex-direction:column;min-height:0;box-shadow:0 -4px 16px rgba(20,31,43,.06);transition:flex .25s ease}
-  .sheet-head{flex:0 0 auto;padding:8px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink-3);display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-user-select:none;user-select:none}
+  .sheet-head{position:relative;flex:0 0 auto;padding:8px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10px;letter-spacing:.16em;color:var(--ink-3);display:flex;align-items:center;gap:8px;cursor:grab;-webkit-user-select:none;user-select:none;touch-action:none}
   .sheet-head .grab{margin-left:auto;color:var(--brass);transition:transform .2s}
+  .sheet.dragging{transition:none}
+  .sheet.dragging .sheet-head{cursor:grabbing}
   .sheet.collapsed{flex:0 0 32px;min-height:32px}
   .sheet.collapsed .list{display:none}
   .sheet.collapsed .sheet-head .grab{transform:rotate(180deg)}
@@ -1222,43 +1225,85 @@
     document.getElementById("fSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const q=e.target.value.trim();if(q)geocode(q);}});
     document.getElementById("locGmaps").onclick=applyGmaps;
     document.getElementById("fGmaps").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();applyGmaps();}});
-    document.getElementById("btnToggleF").onclick=()=>{filtersOpen=!filtersOpen;
-      document.getElementById("filters").classList.toggle("collapsed",!filtersOpen);
-      document.getElementById("btnToggleF").classList.toggle("collapsed",!filtersOpen);
-      document.getElementById("btnToggleF").childNodes[0].nodeValue=filtersOpen?"フィルターを隠す ":"フィルターを表示 ";
-      map.invalidateSize();};
-    // Sheet (list) toggle
-    let sheetOpen=true;
-    function toggleSheet(){
-      sheetOpen=!sheetOpen;
-      document.querySelector(".sheet").classList.toggle("collapsed",!sheetOpen);
-      document.getElementById("sheetGrab").textContent=sheetOpen?"▾ 一覧":"▴ 一覧";
+    // ---- Filters (top): tap or swipe down/up ----
+    function setFilters(open){
+      filtersOpen=open;
+      const b=document.getElementById("btnToggleF");
+      document.getElementById("filters").classList.toggle("collapsed",!open);
+      b.classList.toggle("collapsed",!open);
+      b.childNodes[0].nodeValue=open?"フィルターを隠す ":"フィルターを表示 ";
       map.invalidateSize();
     }
-    document.getElementById("sheetHead").onclick=toggleSheet;
-    // Swipe on sheet head
-    (function(){
-      const sh=document.getElementById("sheetHead");
-      let sy=0;
-      sh.addEventListener("touchstart",e=>{sy=e.touches[0].clientY;},{passive:true});
-      sh.addEventListener("touchend",e=>{
-        const dy=e.changedTouches[0].clientY-sy;
-        if(Math.abs(dy)>30){
-          if(dy<0&&!sheetOpen)toggleSheet(); // swipe up = open
-          if(dy>0&&sheetOpen)toggleSheet();   // swipe down = close
-        }
-      },{passive:true});
-    })();
-    // Swipe on filters
+    document.getElementById("btnToggleF").onclick=()=>setFilters(!filtersOpen);
     (function(){
       const fl=document.getElementById("filters");
-      let sy=0;
-      fl.addEventListener("touchstart",e=>{sy=e.touches[0].clientY;},{passive:true});
-      fl.addEventListener("touchend",e=>{
-        const dy=e.changedTouches[0].clientY-sy;
-        if(dy>40&&filtersOpen){
-          document.getElementById("btnToggleF").click(); // swipe down = close
-        }
+      const full=()=>Math.min(360,fl.scrollHeight||360);
+      let sy=0,h0=0,on=false,moved=false;
+      function start(e){
+        sy=e.touches[0].clientY;h0=fl.getBoundingClientRect().height;
+        on=true;moved=false;
+        fl.classList.add("dragging");fl.classList.remove("collapsed");
+        fl.style.maxHeight=h0+"px";
+      }
+      function move(e){
+        if(!on)return;
+        const dy=e.touches[0].clientY-sy;
+        if(Math.abs(dy)>5)moved=true;
+        fl.style.maxHeight=Math.max(0,Math.min(full(),h0+dy))+"px";
+      }
+      function end(){
+        if(!on)return;on=false;
+        const h=fl.getBoundingClientRect().height;
+        fl.classList.remove("dragging");fl.style.maxHeight="";
+        setFilters(moved?h>full()/2:filtersOpen);
+      }
+      [document.querySelector(".actions"),fl].forEach(el=>{
+        el.addEventListener("touchstart",start,{passive:true});
+        el.addEventListener("touchmove",move,{passive:true});
+        el.addEventListener("touchend",end,{passive:true});
+      });
+    })();
+    // ---- Sheet (bottom list): tap or drag the head ----
+    let sheetOpen=true,sheetDragged=false;
+    function setSheet(open){
+      sheetOpen=open;
+      document.querySelector(".sheet").classList.toggle("collapsed",!open);
+      document.getElementById("sheetGrab").textContent=open?"▾ 一覧":"▴ 一覧";
+      map.invalidateSize();
+    }
+    document.getElementById("sheetHead").onclick=()=>{
+      if(sheetDragged){sheetDragged=false;return;} // ignore the click synthesized after a drag
+      setSheet(!sheetOpen);
+    };
+    (function(){
+      const sheet=document.querySelector(".sheet"),sh=document.getElementById("sheetHead");
+      const SHUT=32;
+      // Snap points: closed / default / tall
+      const snaps=()=>[SHUT,Math.round(innerHeight*.46),Math.round(innerHeight*.8)];
+      const wide=()=>matchMedia("(min-width:820px)").matches; // desktop = side panel, no drag
+      let sy=0,h0=0,on=false;
+      sh.addEventListener("touchstart",e=>{
+        if(wide())return;
+        sy=e.touches[0].clientY;h0=sheet.getBoundingClientRect().height;
+        on=true;sheetDragged=false;
+        sheet.classList.add("dragging");sheet.classList.remove("collapsed");
+        sheet.style.flex="0 0 "+h0+"px";
+      },{passive:true});
+      sh.addEventListener("touchmove",e=>{
+        if(!on)return;
+        const dy=e.touches[0].clientY-sy;
+        if(Math.abs(dy)>5)sheetDragged=true;
+        const s=snaps();
+        sheet.style.flex="0 0 "+Math.max(SHUT,Math.min(s[2],h0-dy))+"px";
+      },{passive:true});
+      sh.addEventListener("touchend",()=>{
+        if(!on)return;on=false;
+        const h=sheet.getBoundingClientRect().height;
+        sheet.classList.remove("dragging");sheet.style.flex="";
+        if(!sheetDragged){setSheet(sheetOpen);return;} // plain tap: let onclick handle it
+        const near=snaps().reduce((a,b)=>Math.abs(b-h)<Math.abs(a-h)?b:a);
+        if(near===SHUT)setSheet(false);
+        else{document.documentElement.style.setProperty("--sheet",near+"px");setSheet(true);}
       },{passive:true});
     })();
     document.getElementById("btnSettings").onclick=openSet;document.getElementById("setClose").onclick=closeSet;scrim2.onclick=closeSet;
