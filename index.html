@@ -399,7 +399,10 @@
   const EMBED_CFG = {
     sheet: "1uiJOgTCVmBA8EuRIWlTxq1QK3mHB-5RbWYi4HJ529Ak",
     apps:  "https://script.google.com/macros/s/AKfycbwCwEFlrSNgcOzN_Na3OHnhcWntwHgwEWIxMjHgGtva0I5_Akq3a4vuMuxywqyL_FE/exec",
-    gkey:  "AIzaSyB0A9A7mS69_R3xepjjeKEYIA_WPULfVAI"
+    gkey:  "AIzaSyB0A9A7mS69_R3xepjjeKEYIA_WPULfVAI",
+    // Must match TOKEN in the Apps Script. Visible to anyone who reads this file,
+    // so it deters drive-by writes only — it is not a secret.
+    token: "atlas-crew-7x2k9m"
   };
   // ============================================================
 
@@ -957,16 +960,35 @@
     }catch(e){if(!silent)toast("同期できません（共有設定 / URLを確認）");}
     updateSync();
   }
+  /* Talk to the Apps Script endpoint and actually read the reply.
+     text/plain keeps this a "simple" request, so there is no CORS preflight;
+     the response is readable, which is the whole point — the old no-cors call
+     reported success even when the sheet rejected the write. */
+  async function callGAS(payload){
+    const c=getCfg();
+    if(!c.apps)return{ok:false,error:"no endpoint",unknown:false};
+    try{
+      const res=await fetch(c.apps,{method:"POST",
+        headers:{"Content-Type":"text/plain;charset=utf-8"},
+        body:JSON.stringify(Object.assign({token:EMBED_CFG.token||""},payload))});
+      const txt=await res.text();
+      let j;try{j=JSON.parse(txt);}catch(e){return{ok:false,error:"bad response",unknown:false};}
+      return{ok:!!j.ok,error:j.error||"",action:j.action||"",unknown:false};
+    }catch(e){
+      // Blocked or offline: we genuinely cannot tell whether it landed.
+      return{ok:false,error:String(e&&e.message||e),unknown:true};
+    }
+  }
   async function pushToSheet(rec){
-    const c=getCfg();if(!c.apps)return{persisted:false};
     const payload=Object.assign({},rec,{
+      action:"upsert",
       category:Array.isArray(rec.categories)?rec.categories.join(","):(rec.category||""),
       delivery:rec.delivery?"1":"",
       role:normRole(rec.role)
     });
     delete payload.categories;delete payload._sample;delete payload._local;delete payload._synced;
-    try{await fetch(c.apps,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(payload)});return{persisted:true};}
-    catch(e){return{persisted:false};}
+    const r=await callGAS(payload);
+    return{persisted:r.ok,unknown:r.unknown,error:r.error};
   }
   function updateSync(){
     const c=getCfg();const on=!!(c.sheet&&c.apps);
@@ -1244,16 +1266,41 @@
       registrant,role:normRole(form.role),
       delivery:!!form.delivery,
       created_at:new Date().toISOString(),place_id:form.placeId||""};
-    if(editing){stores=stores.map(s=>s.id===editing?Object.assign({},s,rec):s);saveCache();closeM();render();toast("更新（この端末の表示）。共有シートの修正はシート側で");return;}
-    rec._local=true;
-    stores.push(rec);saveCache();closeM();render();
+    const isEdit=!!editing;
+    if(isEdit){
+      const prev=stores.find(s=>s.id===editing);
+      if(prev&&prev.created_at)rec.created_at=prev.created_at;   // keep the original timestamp
+      stores=stores.map(s=>s.id===editing?Object.assign({},s,rec):s);
+    }else{
+      rec._local=true;stores.push(rec);
+    }
+    saveCache();closeM();render();
     const c=getCfg();
-    if(c.apps){toast("追加中…みんなのシートに書き込み");const res=await pushToSheet(rec);
-      if(res.persisted){delete rec._local;saveCache();}
-      toast(res.persisted?"追加しました（共有）":"追加（この端末）。同期は後ほど");setTimeout(()=>syncFromSheet(true),3500);}
-    else toast("追加しました（この端末のみ・設定で共同編集を有効化）");
+    if(!c.apps){toast((isEdit?"更新":"追加")+"しました（この端末のみ・設定で共同編集を有効化）");return;}
+    toast((isEdit?"更新":"追加")+"中…みんなのシートに書き込み");
+    const res=await pushToSheet(rec);
+    if(res.persisted){
+      const live=stores.find(s=>s.id===rec.id);if(live)delete live._local;
+      saveCache();toast((isEdit?"更新":"追加")+"しました（共有）");
+    }else if(res.unknown){
+      toast("通信できず、この端末にのみ保存しました");
+    }else{
+      // The sheet actively refused it — say so instead of claiming success.
+      toast("共有シートに保存できません："+(res.error||"不明"));
+    }
+    setTimeout(()=>syncFromSheet(true),3500);
   }
-  function delSpot(id){stores=stores.filter(s=>s.id!==id);saveCache();render();}
+  async function delSpot(id){
+    const rec=stores.find(s=>s.id===id);
+    stores=stores.filter(s=>s.id!==id);saveCache();render();
+    // Local-only rows were never on the sheet, so there is nothing to remove there.
+    if(!getCfg().apps||(rec&&rec._local)){toast("削除しました");return;}
+    const r=await callGAS({action:"delete",id:id});
+    if(r.ok){toast("削除しました（共有）");}
+    else if(r.unknown){toast("削除は端末のみ。通信できず共有側は未処理");}
+    else{toast("共有側の削除に失敗："+(r.error||"不明"));}
+    setTimeout(()=>syncFromSheet(true),2500);
+  }
 
   function exportJSON(){const blob=new Blob([JSON.stringify({app:"atlas-layover",v:2,exported:new Date().toISOString(),stores},null,2)],{type:"application/json"});
     const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="atlas-layover-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(a.href);toast(stores.length+" 軒を書き出しました");}
@@ -1275,28 +1322,86 @@
   function cssq(s){return String(s).replace(/["\\]/g,"\\$&");}
   let tT;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.classList.add("on");clearTimeout(tT);tT=setTimeout(()=>t.classList.remove("on"),2400);}
 
-  const GAS="function doPost(e){\n"+
+  const GAS="/** Atlas — stores endpoint.\n"+
+" *  TOKEN just keeps casual passers-by out; the app is public, so treat it as a\n"+
+" *  speed bump, not a secret. Change it, then redeploy (Deploy > Manage deployments).\n"+
+" */\n"+
+"var TOKEN = 'atlas-crew-7x2k9m';\n"+
+"\n"+
+"function doPost(e){\n"+
 "  try{\n"+
 "    var data = JSON.parse(e.postData.contents);\n"+
-"    var ss = SpreadsheetApp.getActiveSpreadsheet();\n"+
-"    var sh = ss.getSheetByName('stores') || ss.getSheets()[0];\n"+
-"    var lastCol = sh.getLastColumn();\n"+
-"    var headers = sh.getRange(1,1,1,lastCol).getValues()[0];\n"+
-"    var id = data.id || (Date.now()+'-'+Math.floor(Math.random()*100000));\n"+
-"    data.id = id;\n"+
-"    if(!data.created_at) data.created_at = new Date().toISOString();\n"+
+"    if (String(data.token || '') !== TOKEN) return out({ok:false, error:'unauthorized'});\n"+
+"\n"+
+"    var sh = sheet_();\n"+
+"    var headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];\n"+
+"    var idCol = headers.indexOf('id') + 1;\n"+
+"    if (idCol < 1) return out({ok:false, error:'no id column'});\n"+
+"\n"+
+"    var id = String(data.id || '');\n"+
+"    if (!id) return out({ok:false, error:'missing id'});\n"+
+"    var rowNum = findRow_(sh, idCol, id);\n"+
+"\n"+
+"    if (data.action === 'delete'){\n"+
+"      if (rowNum > 0) sh.deleteRow(rowNum);\n"+
+"      return out({ok:true, action:'delete', id:id, found:(rowNum > 0)});\n"+
+"    }\n"+
+"\n"+
+"    var bad = invalid_(data);\n"+
+"    if (bad) return out({ok:false, error:bad});\n"+
+"\n"+
+"    var cAt = headers.indexOf('created_at');\n"+
+"    if (rowNum > 0 && cAt >= 0){\n"+
+"      var prev = sh.getRange(rowNum,1,1,headers.length).getValues()[0];\n"+
+"      if (prev[cAt]) data.created_at = prev[cAt];\n"+
+"    }\n"+
+"    if (!data.created_at) data.created_at = new Date().toISOString();\n"+
+"\n"+
 "    var row = headers.map(function(h){\n"+
 "      var v = data[h];\n"+
-"      return v==null ? '' : (typeof v==='object' ? JSON.stringify(v) : v);\n"+
+"      return v == null ? '' : (typeof v === 'object' ? JSON.stringify(v) : v);\n"+
 "    });\n"+
+"\n"+
+"    if (rowNum > 0){\n"+
+"      sh.getRange(rowNum,1,1,headers.length).setValues([row]);\n"+
+"      return out({ok:true, action:'update', id:id});\n"+
+"    }\n"+
 "    sh.appendRow(row);\n"+
-"    return ContentService.createTextOutput(JSON.stringify({ok:true,id:id}))\n"+
-"      .setMimeType(ContentService.MimeType.JSON);\n"+
-"  }catch(err){\n"+
-"    return ContentService.createTextOutput(JSON.stringify({ok:false,error:String(err)}))\n"+
-"      .setMimeType(ContentService.MimeType.JSON);\n"+
+"    return out({ok:true, action:'insert', id:id});\n"+
+"  } catch(err){\n"+
+"    return out({ok:false, error:String(err)});\n"+
 "  }\n"+
-"}";
+"}\n"+
+"\n"+
+"function sheet_(){\n"+
+"  var ss = SpreadsheetApp.getActiveSpreadsheet();\n"+
+"  return ss.getSheetByName('stores') || ss.getSheets()[0];\n"+
+"}\n"+
+"\n"+
+"function findRow_(sh, idCol, id){\n"+
+"  var n = sh.getLastRow() - 1;\n"+
+"  if (n < 1) return -1;\n"+
+"  var ids = sh.getRange(2, idCol, n, 1).getValues();\n"+
+"  for (var i = 0; i < ids.length; i++){\n"+
+"    if (String(ids[i][0]) === id) return i + 2;\n"+
+"  }\n"+
+"  return -1;\n"+
+"}\n"+
+"\n"+
+"function invalid_(d){\n"+
+"  if (!d.name || String(d.name).trim() === '') return 'name required';\n"+
+"  if (String(d.name).length > 200) return 'name too long';\n"+
+"  var la = Number(d.lat), ln = Number(d.lng);\n"+
+"  if (!isFinite(la) || la < -90 || la > 90) return 'bad lat';\n"+
+"  if (!isFinite(ln) || ln < -180 || ln > 180) return 'bad lng';\n"+
+"  if (d.memo && String(d.memo).length > 2000) return 'memo too long';\n"+
+"  return '';\n"+
+"}\n"+
+"\n"+
+"function out(o){\n"+
+"  return ContentService.createTextOutput(JSON.stringify(o))\n"+
+"    .setMimeType(ContentService.MimeType.JSON);\n"+
+"}\n";
 
   const set=document.getElementById("setModal"),scrim2=document.getElementById("scrim2");
   function openSet(){document.getElementById("gasCode").value=GAS;const c=getCfg();
