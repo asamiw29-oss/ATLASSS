@@ -406,7 +406,7 @@
   };
   // ============================================================
 
-  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1", LAST_AIR_KEY="atlas.lastAir.v1";
+  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1", LAST_AIR_KEY="atlas.lastAir.v1", QUEUE_KEY="atlas.queue.v1";
   // Airport shown before a location is picked; detectRegion overwrites it once one is.
   const DEFAULT_AIR="LAX";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
@@ -954,8 +954,18 @@
           registrant:g(row,"registrant"),role:normRole(g(row,"role")),delivery:normBool(g(row,"delivery")),
           created_at:g(row,"created_at"),place_id:g(row,"place_id")});}
       const sids=new Set(server.map(s=>s.id));
-      const keep=stores.filter(s=>s._local&&!sids.has(s.id));
-      stores=server.concat(keep);saveCache();render();
+      // Pending local changes must survive a sync, or an offline edit would silently
+      // revert to the server copy the moment we reconnect.
+      const qDel=queuedDeletes(),qIds=queuedIds();
+      // The queued record itself is the source of truth — it survives even if the
+      // local cache is lost, which the in-memory list would not.
+      const qRec=new Map(queue.filter(q=>q.op!=="delete").map(q=>[q.rec.id,q.rec]));
+      const mine=new Map(stores.map(s=>[s.id,s]));
+      const pending=id=>qRec.get(id)||mine.get(id);
+      const merged=server.filter(s=>!qDel.has(s.id))
+                         .map(s=>(qIds.has(s.id)&&pending(s.id))?pending(s.id):s);
+      const keep=stores.filter(s=>(s._local||qIds.has(s.id))&&!sids.has(s.id));
+      stores=merged.concat(keep);saveCache();render();
       if(!silent)toast(server.length+" 軒を同期しました");
     }catch(e){if(!silent)toast("同期できません（共有設定 / URLを確認）");}
     updateSync();
@@ -967,17 +977,20 @@
   async function callGAS(payload){
     const c=getCfg();
     if(!c.apps)return{ok:false,error:"no endpoint",unknown:false};
+    // Never let a hung request wedge the flush loop.
+    const ac=("AbortController" in window)?new AbortController():null;
+    const timer=setTimeout(()=>{try{ac&&ac.abort();}catch(e){}},15000);
     try{
-      const res=await fetch(c.apps,{method:"POST",
+      const res=await fetch(c.apps,{method:"POST",signal:ac?ac.signal:undefined,
         headers:{"Content-Type":"text/plain;charset=utf-8"},
         body:JSON.stringify(Object.assign({token:EMBED_CFG.token||""},payload))});
       const txt=await res.text();
       let j;try{j=JSON.parse(txt);}catch(e){return{ok:false,error:"bad response",unknown:false};}
       return{ok:!!j.ok,error:j.error||"",action:j.action||"",unknown:false};
     }catch(e){
-      // Blocked or offline: we genuinely cannot tell whether it landed.
+      // Blocked, timed out or offline: we genuinely cannot tell whether it landed.
       return{ok:false,error:String(e&&e.message||e),unknown:true};
-    }
+    }finally{clearTimeout(timer);}
   }
   async function pushToSheet(rec){
     const payload=Object.assign({},rec,{
@@ -990,10 +1003,46 @@
     const r=await callGAS(payload);
     return{persisted:r.ok,unknown:r.unknown,error:r.error};
   }
+
+  /* ---- Offline write queue ----
+     Writes that failed because there was no network are parked here and replayed
+     when connectivity returns. Writes the sheet actively REFUSED are not queued —
+     retrying a bad token or invalid row would just loop forever. */
+  let queue=(function(){try{return JSON.parse(localStorage.getItem(QUEUE_KEY))||[];}catch(e){return[];}})();
+  const qKey=q=>q.op==="delete"?q.id:q.rec.id;
+  function saveQueue(){try{localStorage.setItem(QUEUE_KEY,JSON.stringify(queue));}catch(e){}}
+  function queuedIds(){return new Set(queue.map(qKey));}
+  function queuedDeletes(){return new Set(queue.filter(q=>q.op==="delete").map(q=>q.id));}
+  function enqueue(entry){
+    queue=queue.filter(q=>qKey(q)!==qKey(entry));  // newest pending change per store wins
+    queue.push(entry);saveQueue();updateSync();
+  }
+  let flushing=false;
+  async function flushQueue(){
+    if(flushing||!queue.length||!getCfg().apps||!navigator.onLine)return;
+    flushing=true;
+    let sent=0,dropped=0;
+    try{
+      for(const q of queue.slice()){
+        const r=q.op==="delete"?await callGAS({action:"delete",id:q.id}):await pushToSheet(q.rec);
+        const ok=q.op==="delete"?r.ok:r.persisted;
+        if(ok){queue=queue.filter(x=>x!==q);saveQueue();sent++;continue;}
+        if(r.unknown)break;                        // still offline — keep the rest for later
+        queue=queue.filter(x=>x!==q);saveQueue();dropped++;  // refused: retrying cannot help
+      }
+    }finally{flushing=false;}
+    updateSync();
+    if(sent)toast("未送信の変更 "+sent+" 件を送信しました");
+    if(dropped)toast("送信できない変更 "+dropped+" 件を破棄しました");
+    if(sent&&!queue.length)syncFromSheet(true);
+  }
   function updateSync(){
     const c=getCfg();const on=!!(c.sheet&&c.apps);
     document.getElementById("syncDot").classList.toggle("on",on);
-    document.getElementById("syncLabel").textContent=on?"共同編集":(c.sheet?"読取のみ":"ローカル");
+    document.getElementById("syncDot").classList.toggle("offline",!navigator.onLine);
+    let label=!navigator.onLine?"オフライン":(on?"共同編集":(c.sheet?"読取のみ":"ローカル"));
+    if(queue.length)label+=" · 未送信"+queue.length;
+    document.getElementById("syncLabel").textContent=label;
     const st=document.getElementById("setStatus"),tx=document.getElementById("setStatusText");
     if(st){st.classList.toggle("on",on);tx.textContent=on?"共同編集：有効（みんなのシートに接続中）":(c.sheet?"読取のみ：追加はこの端末に保存":"未設定：この端末にのみ保存されます");}
   }
@@ -1251,6 +1300,15 @@
   function updHov(){document.querySelectorAll("#acList li[data-i]").forEach((li,i)=>li.classList.toggle("hov",i===acHov));
     const el=document.querySelector("#acList li.hov");if(el)el.scrollIntoView({block:"nearest"});}
 
+  /* Same Google place, or same name within ~200m — the two ways a shared map
+     ends up with the same shop twice. */
+  function findDuplicate(rec){
+    const n=rec.name.trim().toLowerCase();
+    return stores.find(s=>s.id!==rec.id&&(
+      (rec.place_id&&s.place_id&&s.place_id===rec.place_id)||
+      (String(s.name||"").trim().toLowerCase()===n&&distKm(s.lat,s.lng,rec.lat,rec.lng)<0.2)
+    ));
+  }
   function validate(){document.getElementById("mSave").disabled=!(document.getElementById("fName").value.trim()&&form.lat!=null);}
   async function saveSpot(){
     const name=document.getElementById("fName").value.trim();if(!name||form.lat==null)return;
@@ -1267,6 +1325,10 @@
       delivery:!!form.delivery,
       created_at:new Date().toISOString(),place_id:form.placeId||""};
     const isEdit=!!editing;
+    if(!isEdit){
+      const dup=findDuplicate(rec);
+      if(dup&&!confirm("「"+dup.name+"」（"+airOf(dup.region).city+"）がすでに登録されています。\nそれでも追加しますか？"))return;
+    }
     if(isEdit){
       const prev=stores.find(s=>s.id===editing);
       if(prev&&prev.created_at)rec.created_at=prev.created_at;   // keep the original timestamp
@@ -1283,7 +1345,8 @@
       const live=stores.find(s=>s.id===rec.id);if(live)delete live._local;
       saveCache();toast((isEdit?"更新":"追加")+"しました（共有）");
     }else if(res.unknown){
-      toast("通信できず、この端末にのみ保存しました");
+      enqueue({op:"upsert",rec:Object.assign({},rec)});
+      toast("圏外のため未送信。オンラインになったら自動で送ります");
     }else{
       // The sheet actively refused it — say so instead of claiming success.
       toast("共有シートに保存できません："+(res.error||"不明"));
@@ -1297,7 +1360,7 @@
     if(!getCfg().apps||(rec&&rec._local)){toast("削除しました");return;}
     const r=await callGAS({action:"delete",id:id});
     if(r.ok){toast("削除しました（共有）");}
-    else if(r.unknown){toast("削除は端末のみ。通信できず共有側は未処理");}
+    else if(r.unknown){enqueue({op:"delete",id:id});toast("圏外のため未送信。オンラインになったら自動で削除します");}
     else{toast("共有側の削除に失敗："+(r.error||"不明"));}
     setTimeout(()=>syncFromSheet(true),2500);
   }
@@ -1437,11 +1500,8 @@
       navigator.serviceWorker.register("sw.js").catch(()=>{});
     }
     function showOnline(){
-      const d=document.getElementById("syncDot"),t=document.getElementById("syncLabel");
-      if(!d||!t)return;
-      d.classList.toggle("offline",!navigator.onLine);
-      if(!navigator.onLine)t.textContent="オフライン";
-      else updateSync();
+      updateSync();
+      if(navigator.onLine)flushQueue();   // replay anything parked while offline
     }
     addEventListener("online",showOnline);addEventListener("offline",showOnline);showOnline();
     document.getElementById("btnNear").onclick=toggleNear;
