@@ -309,7 +309,7 @@
     <div class="pasteHint">Google Maps で「共有 → リンクをコピー」→ ここをタップ</div>
     <div class="fld nameFld">
       <label>店名 / NAME <span class="acHint" id="acHint">— 入力すると候補が出ます</span></label>
-      <input type="text" id="fName" placeholder="例：ソンブーン、Tiong Bahru Bakery…" autocomplete="off">
+      <input type="text" id="fName" placeholder="例：Tiong Bahru Bakery…" autocomplete="off">
       <ul class="acList" id="acList"></ul>
     </div>
     <div class="fld">
@@ -403,7 +403,9 @@
   };
   // ============================================================
 
-  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1";
+  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1", LAST_AIR_KEY="atlas.lastAir.v1";
+  // Airport shown before a location is picked; detectRegion overwrites it once one is.
+  const DEFAULT_AIR="LAX";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
   const HAS_EMBED=!!(EMBED_CFG.sheet && EMBED_CFG.apps);
 
@@ -664,13 +666,36 @@
     const lc=s.toLowerCase();if(OLD2AIR[lc]!==undefined)return OLD2AIR[lc];
     return null;
   }
+  /* Airports that sit in the shadow of a bigger gateway serving the same metro.
+     Crew lay over at the hub, so these should only win when they are clearly
+     closer. Everything not listed here counts as a hub. */
+  const SECONDARY=new Set([
+    // Japan: every airport other than the seven gateways crew actually lay over at
+    // (HND / NRT / KIX / NGO / CTS / FUK / OKA).
+    "IBR","KIJ","FSZ","KMQ","TOY","FKJ","ITM","UKB","SHM","OKJ","HIJ","YGJ",
+    "IZO","TTJ","UBJ","TAK","MYJ","KCZ","TKS","KKJ","OIT","NGS","KMJ","KOJ",
+    "KMI","FUJ","TSJ","ISG","MMY","OGN","UEO","ASJ","AOJ","HNA","AXT","SDJ",
+    "FKS","SYO","HKD","KUH","OBO","MMB","WKJ","AKJ",
+    "GMP",        // kr → ICN
+    "SHA",        // gc → PVG
+    "TSA",        // tw → TPE
+    "DMK","CRK",  // se → BKK / MNL
+    "LGW","ORY",  // eu → LHR / CDG
+    "SJC"         // na → SFO
+  ]);
+  // How much farther a hub may be and still be preferred (km).
+  // 50-70 all scored 32/32 on the spot-check set; 60 sits furthest from both edges.
+  const HUB_BONUS_KM=60;
+
   function detectRegion(lat,lng){
     if(typeof lat!=="number"||typeof lng!=="number"||isNaN(lat)||isNaN(lng))return"HND";
     const cf=Math.cos(lat*Math.PI/180);
     let best=AIRPORTS[0],bd=Infinity;
     for(const a of AIRPORTS){
-      const dl=a.lat-lat,dn=(a.lng-lng)*cf;const d=dl*dl+dn*dn;
-      if(d<bd){bd=d;best=a;}
+      const dl=(a.lat-lat)*111,dn=(a.lng-lng)*cf*111;
+      const km=Math.sqrt(dl*dl+dn*dn);
+      const score=SECONDARY.has(a.code)?km:km-HUB_BONUS_KM;
+      if(score<bd){bd=score;best=a;}
     }
     return best.code;
   }
@@ -693,7 +718,7 @@
   let fMacro="ALL",fAirport="ALL",fCat="ALL",q="",filtersOpen=false;
   let map,layer,markers=[],temp=null,tapArmed=false,editing=null,zoomLabels=false;
   let form=blank();
-  function blank(){return{region:"BKK",cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:""};}
+  function blank(){return{region:getLastAir(),cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:""};}
 
   function getCfg(){if(HAS_EMBED)return{sheet:EMBED_CFG.sheet,apps:EMBED_CFG.apps};try{return JSON.parse(localStorage.getItem(CFG_KEY))||{};}catch(e){return{};}}
   function setCfg(c){try{localStorage.setItem(CFG_KEY,JSON.stringify(c));}catch(e){}}
@@ -1163,6 +1188,8 @@
 
   function getLastReg(){try{return localStorage.getItem(LAST_REG_KEY)||"";}catch(e){return"";}}
   function saveLastReg(v){try{if(v)localStorage.setItem(LAST_REG_KEY,v);}catch(e){}}
+  function getLastAir(){try{return normReg(localStorage.getItem(LAST_AIR_KEY)||"")||DEFAULT_AIR;}catch(e){return DEFAULT_AIR;}}
+  function saveLastAir(v){try{if(normReg(v))localStorage.setItem(LAST_AIR_KEY,normReg(v));}catch(e){}}
   function getLastRole(){try{return normRole(localStorage.getItem(LAST_ROLE_KEY)||"");}catch(e){return"";}}
   function saveLastRole(v){try{if(v)localStorage.setItem(LAST_ROLE_KEY,v);}catch(e){}}
 
@@ -1207,6 +1234,7 @@
     const name=document.getElementById("fName").value.trim();if(!name||form.lat==null)return;
     const registrant=document.getElementById("fReg").value.trim();
     if(registrant)saveLastReg(registrant);
+    saveLastAir(document.getElementById("fRegion").value);
     const cats=(form.cats&&form.cats.length?form.cats:["other"]).slice();
     const rec={id:editing||uid(),name,
       categories:cats,category:cats.join(","),
