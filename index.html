@@ -748,9 +748,11 @@
       s("ATLAS Bar",["bar"],"SIN",1.3006,103.8577,"アールデコの名バー。（サンプル）")];
   }
 
+  // Opening view: an Asia-wide frame centred on Japan (not fitted to the data).
+  const HOME_VIEW={center:[30,131],zoom:3.5};
   let tileLo,tileHi;
   function initMap(){
-    map=L.map("map",{zoomControl:true,minZoom:2}).setView([20,110],3);
+    map=L.map("map",{zoomControl:true,minZoom:2}).setView(HOME_VIEW.center,HOME_VIEW.zoom);
     const attr="© OpenStreetMap © CARTO";
     tileLo=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:attr,subdomains:"abcd"});
     tileHi=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:attr,subdomains:"abcd"});
@@ -904,9 +906,12 @@
 
   function renderList(){
     const wrap=document.getElementById("list");wrap.innerHTML="";
+    // Default order: newest post first. created_at is an ISO string, so it sorts
+    // chronologically as text; rows without one fall to the bottom.
+    const byNew=(a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""));
     const list=filtered().slice().sort(sortNear&&userPos
       ?(a,b)=>distOf(a)-distOf(b)
-      :(a,b)=>(a.region+a.name).localeCompare(b.region+b.name,"ja"));
+      :byNew);
     if(!list.length){wrap.innerHTML=`<div class="empty"><div class="big">${stores.length?"該当する店がありません":"最初の一軒を追加"}</div>${stores.length?(q?`「${esc(q)}」に一致する店はありません`:"フィルターを外して全件表示"):"右下の＋、または「お店を追加」から登録"}</div>`;return;}
     list.forEach(s=>{const cats=s.categories||["other"];const c=catOf(cats[0]),a=airOf(s.region);
       const catText=cats.map(cid=>catOf(cid).label).join(" · ");
@@ -1605,12 +1610,12 @@
     document.getElementById("fileInput").addEventListener("change",e=>{if(e.target.files[0])importJSON(e.target.files[0]);e.target.value="";});
     document.getElementById("cpCode").onclick=()=>{const t=document.getElementById("gasCode");t.select();
       try{navigator.clipboard.writeText(GAS);}catch(e){document.execCommand("copy");}toast("Apps Script コードをコピー");};
-    document.getElementById("brand").onclick=()=>{map.setView([20,110],3);};
+    document.getElementById("brand").onclick=()=>{map.setView(HOME_VIEW.center,HOME_VIEW.zoom);};
   }
 
   fillSelects();initMap();wire();render();updateSync();
   if(HAS_EMBED&&!IS_ADMIN){document.getElementById("btnSettings").style.display="none";}
-  if(stores.length){const p=stores.map(s=>[s.lat,s.lng]);try{map.fitBounds(p,{padding:[50,50],maxZoom:5});}catch(e){}}
+  // Keep the fixed Japan-centred opening view — do not fit to the data spread.
   if(csvUrl())syncFromSheet(true);
   setTimeout(()=>document.getElementById("splash").classList.add("gone"),1200);
 })();
