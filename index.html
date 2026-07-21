@@ -32,7 +32,7 @@
     --ink:#26313d;--ink-2:#5b6470;--ink-3:#8c9098;
     --brass:#A98B5D;--brass-d:#8a7047;
     --serif:'IBM Plex Serif',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace;
-    --sheet:46vh;
+    --sheet:34vh;
     /* Dead space under the sheet head so drags never start in iOS's home-indicator gesture zone */
     --safeb:calc(env(safe-area-inset-bottom,0px) + 14px);
   }
@@ -749,7 +749,7 @@
   }
 
   // Opening view: an Asia-wide frame centred on Japan (not fitted to the data).
-  const HOME_VIEW={center:[30,131],zoom:3.5};
+  const HOME_VIEW={center:[30,132],zoom:3};
   let tileLo,tileHi;
   function initMap(){
     map=L.map("map",{zoomControl:true,minZoom:2}).setView(HOME_VIEW.center,HOME_VIEW.zoom);
@@ -1573,7 +1573,7 @@
       // Collapsed height = head bar + the safe-area spacer (measured, not hardcoded)
       const SHUT=()=>sh.offsetHeight+(parseFloat(getComputedStyle(sheet).paddingBottom)||0);
       // Snap points: closed / default / tall
-      const snaps=()=>[SHUT(),Math.round(innerHeight*.46),Math.round(innerHeight*.8)];
+      const snaps=()=>[SHUT(),Math.round(innerHeight*.34),Math.round(innerHeight*.8)];
       const wide=()=>matchMedia("(min-width:820px)").matches; // desktop = side panel, no drag
       let sy=0,h0=0,on=false;
       sh.addEventListener("touchstart",e=>{
