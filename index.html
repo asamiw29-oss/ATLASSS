@@ -750,6 +750,14 @@
 
   // Opening view: an Asia-wide frame centred on Japan (not fitted to the data).
   const HOME_VIEW={center:[30,132],zoom:3};
+  /* This map is Japan/Pacific-centred, so the Americas belong to the EAST across
+     the Pacific, not the far west. dispLng shifts western-hemisphere points by
+     +360 for DISPLAY only (markers + camera), so Hawaii/N.America are reachable
+     by panning east over the Pacific. Stored coords stay raw [-180,180] — use
+     wrapLng to bring any map-derived longitude back into that range. */
+  const dispLng=lng=>lng<-30?lng+360:lng;
+  const wrapLng=lng=>((lng+180)%360+360)%360-180;
+  const dispLL=(lat,lng)=>[lat,dispLng(lng)];
   let tileLo,tileHi;
   function initMap(){
     map=L.map("map",{zoomControl:true,minZoom:2}).setView(HOME_VIEW.center,HOME_VIEW.zoom);
@@ -764,7 +772,7 @@
       if(z<5&&!map.hasLayer(tileLo)){map.removeLayer(tileHi);tileLo.addTo(map);}
       const want=z>=13;if(want!==zoomLabels){zoomLabels=want;markers.forEach(m=>{if(want)m.openTooltip();else m.closeTooltip();});}
     });
-    map.on("click",e=>{if(!tapArmed)return;setLatLng(e.latlng.lat,e.latlng.lng);tapArmed=false;document.getElementById("locTap").classList.remove("armed");});
+    map.on("click",e=>{if(!tapArmed)return;setLatLng(e.latlng.lat,wrapLng(e.latlng.lng));tapArmed=false;document.getElementById("locTap").classList.remove("armed");});
   }
   function icon(color,t){return L.divIcon({className:"",iconSize:[16,20],iconAnchor:[8,19],popupAnchor:[0,-18],
     html:`<div class="pin${t?' temp':''}" style="background:${color}"></div>`});}
@@ -773,7 +781,8 @@
     layer.clearLayers();markers=[];
     filtered().forEach(s=>{
       const cats=s.categories||["other"];const c=catOf(cats[0]);
-      const m=L.marker([s.lat,s.lng],{icon:icon(c.color)}).addTo(layer);
+      const m=L.marker(dispLL(s.lat,s.lng),{icon:icon(c.color)}).addTo(layer);
+      m._sid=s.id;
       m.bindTooltip(esc(s.name),{permanent:true,direction:"top",offset:[0,-16],className:"name"});
       if(!zoomLabels)m.closeTooltip();
       m.bindPopup(popup(s));m.on("popupopen",()=>bindPop(s.id));
@@ -880,7 +889,7 @@
   function showUserMarker(){
     if(!userPos)return;
     if(userMarker)map.removeLayer(userMarker);
-    userMarker=L.circleMarker([userPos.lat,userPos.lng],{radius:7,weight:3,color:"#2b7fff",fillColor:"#2b7fff",fillOpacity:.35})
+    userMarker=L.circleMarker(dispLL(userPos.lat,userPos.lng),{radius:7,weight:3,color:"#2b7fff",fillColor:"#2b7fff",fillOpacity:.35})
       .addTo(map).bindPopup("現在地");
   }
   function toggleNear(){
@@ -900,7 +909,7 @@
   function focusNear(){
     if(!userPos)return;
     const near=filtered().slice().sort((a,b)=>distOf(a)-distOf(b)).slice(0,3);
-    const pts=[[userPos.lat,userPos.lng]].concat(near.map(s=>[s.lat,s.lng]));
+    const pts=[dispLL(userPos.lat,userPos.lng)].concat(near.map(s=>dispLL(s.lat,s.lng)));
     try{map.fitBounds(pts,{padding:[60,60],maxZoom:13});}catch(e){}
   }
 
@@ -925,9 +934,9 @@
         ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>`;
       it.onclick=()=>flyTo(s);wrap.appendChild(it);});
   }
-  function flyTo(s){map.flyTo([s.lat,s.lng],Math.max(map.getZoom(),14),{duration:.6});
-    markers.forEach(m=>{const ll=m.getLatLng();if(ll.lat===s.lat&&ll.lng===s.lng)m.openPopup();});}
-  function fitFilter(){const p=filtered().map(s=>[s.lat,s.lng]);if(p.length)try{map.fitBounds(p,{padding:[50,50],maxZoom:14});}catch(e){}}
+  function flyTo(s){map.flyTo(dispLL(s.lat,s.lng),Math.max(map.getZoom(),14),{duration:.6});
+    markers.forEach(m=>{if(m._sid===s.id)m.openPopup();});}
+  function fitFilter(){const p=filtered().map(s=>dispLL(s.lat,s.lng));if(p.length)try{map.fitBounds(p,{padding:[50,50],maxZoom:14});}catch(e){}}
 
   function parseCSV(text){const rows=[];let row=[],f="",i=0,q=false;
     while(i<text.length){const c=text[i];
@@ -1121,7 +1130,7 @@
   function setLatLng(lat,lng){form.lat=lat;form.lng=lng;locStatus();showTemp(lat,lng);
     const code=detectRegion(lat,lng);form.region=code;const sel=document.getElementById("fRegion");if(sel)sel.value=code;
     const a=airOf(code);validate();toast("位置を設定 → 最寄空港「"+code+" "+a.city+"」");}
-  function showTemp(lat,lng){clearTemp();temp=L.marker([lat,lng],{icon:icon("#1C2A3A",true),zIndexOffset:1000}).addTo(map);}
+  function showTemp(lat,lng){clearTemp();temp=L.marker(dispLL(lat,lng),{icon:icon("#1C2A3A",true),zIndexOffset:1000}).addTo(map);}
   function clearTemp(){if(temp){map.removeLayer(temp);temp=null;}}
   function arm(){tapArmed=true;document.getElementById("locTap").classList.add("armed");toast("地図をタップして位置を指定");}
   function disarm(){tapArmed=false;const b=document.getElementById("locTap");if(b)b.classList.remove("armed");}
@@ -1130,7 +1139,7 @@
     try{const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q="+encodeURIComponent(q),{headers:{"Accept":"application/json"}});
       const d=await r.json();box.innerHTML="";if(!d.length){box.innerHTML="<li>該当なし</li>";return;}
       d.forEach(x=>{const li=document.createElement("li");li.textContent=x.display_name;
-        li.onclick=()=>{setLatLng(parseFloat(x.lat),parseFloat(x.lon));map.setView([x.lat,x.lon],15);box.innerHTML="";};box.appendChild(li);});
+        li.onclick=()=>{const la=parseFloat(x.lat),ln=parseFloat(x.lon);setLatLng(la,ln);map.setView(dispLL(la,ln),15);box.innerHTML="";};box.appendChild(li);});
     }catch(e){box.innerHTML="<li>検索できません（オフライン？）</li>";}}
 
   function parseGmaps(raw){if(!raw)return null;const s=raw.trim();
@@ -1143,7 +1152,7 @@
     if(!res){toast("リンクから座標を取得できませんでした");return;}
     if(res.short){toast("短縮リンクは一度開いて完全なURLを貼り付けてください");return;}
     if(res.lat==null){toast("座標が見つかりません（@lat,lng を含むURLを）");return;}
-    setLatLng(res.lat,res.lng);map.setView([res.lat,res.lng],16);
+    setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
     const n=document.getElementById("fName");if(res.name&&!n.value.trim())n.value=res.name;validate();inp.value="";}
 
   // ---- Google Places (New) autocomplete ----
@@ -1242,7 +1251,7 @@
       const d=await r.json();
       if(d.location){
         setLatLng(d.location.latitude,d.location.longitude);
-        map.setView([d.location.latitude,d.location.longitude],16);
+        map.setView(dispLL(d.location.latitude,d.location.longitude),16);
         const gc=guessCatFromTypes(d.primaryType,d.types||[]);
         if(gc&&!form.cats.includes(gc))form.cats=[gc];
         refreshCatUI();
@@ -1279,7 +1288,7 @@
     if(res){
       if(res.short){toast("短縮リンクは開いて完全URLをコピーしてください");return;}
       if(res.lat!=null){
-        setLatLng(res.lat,res.lng);map.setView([res.lat,res.lng],16);
+        setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
         const n=document.getElementById("fName");
         if(res.name&&!n.value.trim()){n.value=res.name;scheduleAC();}
         validate();toast(res.name?"位置と店名を反映":"位置を反映");
@@ -1495,7 +1504,7 @@
     document.getElementById("fDelivery").addEventListener("change",e=>form.delivery=e.target.checked);
     document.getElementById("locTap").onclick=()=>{tapArmed?disarm():arm();};
     document.getElementById("locHere").onclick=()=>{if(!navigator.geolocation){toast("位置情報が使えません");return;}toast("現在地を取得中…");
-      navigator.geolocation.getCurrentPosition(p=>{setLatLng(p.coords.latitude,p.coords.longitude);map.setView([p.coords.latitude,p.coords.longitude],15);},()=>toast("現在地を取得できません"));};
+      navigator.geolocation.getCurrentPosition(p=>{setLatLng(p.coords.latitude,p.coords.longitude);map.setView(dispLL(p.coords.latitude,p.coords.longitude),15);},()=>toast("現在地を取得できません"));};
     document.getElementById("locSearch").onclick=()=>{const q=document.getElementById("fSearch").value.trim();if(q)geocode(q);};
     document.getElementById("fSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const q=e.target.value.trim();if(q)geocode(q);}});
     document.getElementById("locGmaps").onclick=applyGmaps;
