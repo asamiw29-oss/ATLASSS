@@ -1147,7 +1147,22 @@
     if(/(goo\.gl\/maps|maps\.app\.goo\.gl)/i.test(s)&&!/@|!3d|[?&](q|query|ll)=/.test(s))return{short:true};
     let name=null;const pm=s.match(/\/place\/([^\/@?]+)/);if(pm){try{name=decodeURIComponent(pm[1].replace(/\+/g," ")).trim();}catch(e){name=pm[1].replace(/\+/g," ").trim();}}
     let c=s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||s.match(/[?&](?:q|query|ll|destination|daddr)=(-?\d+\.\d+),(-?\d+\.\d+)/);
-    if(c)return{lat:+c[1],lng:+c[2],name};return name?{name}:null;}
+    if(c)return{lat:+c[1],lng:+c[2],name};
+    // Some shared links (iOS "share") resolve to ?q=<store + address> with no coords.
+    // Keep the text so we can geocode it.
+    const qm=s.match(/[?&](?:q|query|destination|daddr)=([^&]+)/);
+    if(qm){let qt;try{qt=decodeURIComponent(qm[1].replace(/\+/g," ")).trim();}catch(e){qt=qm[1].replace(/\+/g," ").trim();}
+      if(qt&&!/^-?\d+\.\d+\s*,/.test(qt)){
+        const nm=name||((qt.match(/^(.*?)\s*\d/)||[])[1]||"").trim()||null;
+        return{query:qt,name:nm};
+      }}
+    return name?{name}:null;}
+  async function geocodeOne(q){
+    try{const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q),{headers:{"Accept":"application/json"}});
+      const d=await r.json();if(d&&d.length)return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};
+    }catch(e){}return null;}
+  // Nominatim dislikes a leading business name, so geocode from the first street number.
+  function addrFromQuery(q){const m=q.match(/\d.*/);return m?m[0]:q;}
   // maps.app.goo.gl / goo.gl/maps can't be expanded in the browser (CORS), so we
   // ask the Apps Script to follow the redirects and hand back the full URL, then
   // re-parse that. Returns a parsed {lat,lng,name} or a reason it could not.
@@ -1158,7 +1173,13 @@
     const r=await callGAS({action:"resolve",url:u});
     if(!r.ok||!r.url)return{err:r.unknown?"offline":"failed"};
     const p=parseGmaps(r.url);
-    return(p&&p.lat!=null)?{res:p}:{err:"no-coords"};
+    if(p&&p.lat!=null)return{res:p};
+    // No coords in the resolved URL — geocode the address text it carried.
+    if(p&&p.query){
+      const geo=await geocodeOne(addrFromQuery(p.query))||await geocodeOne(p.query);
+      if(geo)return{res:{lat:geo.lat,lng:geo.lng,name:p.name}};
+    }
+    return{err:"no-coords"};
   }
   async function applyGmaps(){const inp=document.getElementById("fGmaps");let res=parseGmaps(inp.value);
     if(!res){toast("リンクから座標を取得できませんでした");return;}
