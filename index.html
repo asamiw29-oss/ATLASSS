@@ -1151,9 +1151,11 @@
       }}
     return name?{name}:null;}
   async function geocodeOne(q){
-    try{const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q),{headers:{"Accept":"application/json"}});
+    const ac=("AbortController"in window)?new AbortController():null;
+    const timer=setTimeout(()=>{try{ac&&ac.abort();}catch(e){}},8000);  // never hang the UI
+    try{const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q),{headers:{"Accept":"application/json"},signal:ac?ac.signal:undefined});
       const d=await r.json();if(d&&d.length)return{lat:parseFloat(d[0].lat),lng:parseFloat(d[0].lon)};
-    }catch(e){}return null;}
+    }catch(e){}finally{clearTimeout(timer);}return null;}
   // Nominatim dislikes a leading business name, so geocode from the first street number.
   function addrFromQuery(q){const m=q.match(/\d.*/);return m?m[0]:q;}
   // maps.app.goo.gl / goo.gl/maps can't be expanded in the browser (CORS), so we
@@ -1172,12 +1174,26 @@
       const geo=await geocodeOne(addrFromQuery(p.query))||await geocodeOne(p.query);
       if(geo)return{res:{lat:geo.lat,lng:geo.lng,name:p.name}};
     }
-    return{err:"no-coords"};
+    // Couldn't get coords — hand back whatever text we learned so the caller can pre-fill.
+    return{err:"no-coords",name:(p&&p.name)||null,query:(p&&p.query)||null};
+  }
+  // Turn a failed expansion into a head start instead of a dead end.
+  function fillFromFailedExpand(e){
+    let did=false;
+    if(e.name){const n=document.getElementById("fName");if(n&&!n.value.trim()){n.value=e.name;scheduleAC();did=true;}}
+    if(e.query){const sf=document.getElementById("fSearch");if(sf){sf.value=addrFromQuery(e.query);did=true;}}
+    validate();
+    return did;
   }
   async function applyGmaps(){const inp=document.getElementById("fGmaps");let res=parseGmaps(inp.value);
     if(!res){toast("リンクから座標を取得できませんでした");return;}
     if(res.short){toast("短縮リンクを展開中…");const e=await expandShort(inp.value);
-      if(e.err){toast(e.err==="no-endpoint"?"短縮リンクは一度開いて完全URLを貼り付けてください":"短縮リンクを展開できませんでした");return;}
+      if(e.err){
+        if(e.err==="no-endpoint"){toast("短縮リンクは一度開いて完全URLを貼り付けてください");return;}
+        const did=fillFromFailedExpand(e);
+        toast(did?"位置は取れず。店名/住所を入れました → 住所検索 か 候補から選択":"短縮リンクから位置を取得できませんでした");
+        inp.value="";return;
+      }
       res=e.res;}
     if(res.lat==null){toast("座標が見つかりません（@lat,lng を含むURLを）");return;}
     setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
