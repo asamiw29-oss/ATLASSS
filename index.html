@@ -1172,6 +1172,25 @@
     for(const c of geoCandidates(q)){const g=await geocodeOne(c);if(g)return g;}
     return null;
   }
+  // Google's own text search — same data as the shared link, and it works from the
+  // browser with our (referrer-restricted) key, unlike Nominatim which gets CORS-blocked.
+  async function placesTextSearch(q){
+    const key=EMBED_CFG.gkey;if(!key)return null;
+    const ac=("AbortController"in window)?new AbortController():null;
+    const timer=setTimeout(()=>{try{ac&&ac.abort();}catch(e){}},8000);
+    try{
+      const r=await fetch("https://places.googleapis.com/v1/places:searchText",{
+        method:"POST",signal:ac?ac.signal:undefined,
+        headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,
+          "X-Goog-FieldMask":"places.location,places.displayName,places.id"},
+        body:JSON.stringify({textQuery:q,languageCode:"ja"})});
+      const d=await r.json();
+      if(d.places&&d.places.length){const p=d.places[0];
+        return{lat:p.location.latitude,lng:p.location.longitude,
+          name:(p.displayName&&p.displayName.text)||null,placeId:p.id||null};}
+    }catch(e){}finally{clearTimeout(timer);}
+    return null;
+  }
   // maps.app.goo.gl / goo.gl/maps can't be expanded in the browser (CORS), so we
   // ask the Apps Script to follow the redirects and hand back the full URL, then
   // re-parse that. Returns a parsed {lat,lng,name} or a reason it could not.
@@ -1185,7 +1204,9 @@
     if(p&&p.lat!=null)return{res:p};
     // No coords in the resolved URL — geocode the address text it carried.
     if(p&&p.query){
-      const geo=await geocodeQuery(p.query);
+      const g=await placesTextSearch(p.query);   // Google's own data: exact place, name, place_id
+      if(g)return{res:{lat:g.lat,lng:g.lng,name:g.name||p.name,placeId:g.placeId}};
+      const geo=await geocodeQuery(p.query);      // fallback: OSM (may be blocked in some browsers)
       if(geo)return{res:{lat:geo.lat,lng:geo.lng,name:p.name}};
     }
     // Couldn't get coords — hand back whatever text we learned so the caller can pre-fill.
@@ -1211,6 +1232,7 @@
       res=e.res;}
     if(res.lat==null){toast("座標が見つかりません（@lat,lng を含むURLを）");return;}
     setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
+    if(res.placeId)form.placeId=res.placeId;
     const n=document.getElementById("fName");if(res.name&&!n.value.trim())n.value=res.name;validate();inp.value="";}
 
   // ---- Google Places (New) autocomplete ----
