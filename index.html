@@ -157,8 +157,6 @@
   .loc{background:var(--paper-2);border:1px solid var(--line-2);border-radius:5px;padding:11px}
   .loc .status{font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-2);margin-bottom:9px;display:flex;align-items:center;gap:7px}
   .loc .status .ok{color:#5f8a6b}.loc .status .no{color:#a8493f}
-  .loc-btns{display:flex;gap:7px;flex-wrap:wrap}
-  .loc-btns button{font-size:10px;letter-spacing:.06em;border:1px solid var(--line-2);border-radius:4px;padding:8px 10px;background:var(--paper);color:var(--ink-2)}
   .srow{display:flex;gap:6px;margin-top:8px}
   .srow input{flex:1;background:var(--paper);border:1px solid var(--line-2);border-radius:4px;padding:8px 10px;font-size:13px}
   .srow button{flex:0 0 auto;font-size:10px;letter-spacing:.06em;border:1px solid var(--line-2);border-radius:4px;padding:0 12px;background:var(--paper)}
@@ -313,8 +311,7 @@
     <div class="fld">
       <label>位置 / LOCATION</label>
       <div class="loc">
-        <div class="status" id="locStatus"><span class="no">●</span> 未設定 — 現在地 / GMapリンク / 検索</div>
-        <div class="loc-btns"><button id="locHere">現在地</button></div>
+        <div class="status" id="locStatus"><span class="no">●</span> 未設定 — GMapリンク貼付 / 住所検索</div>
         <div class="locHint">Google Maps で「共有 → リンクをコピー」して、下の欄に貼り付け → 取込</div>
         <div class="srow"><input type="text" id="fGmaps" inputmode="url" autocomplete="off" placeholder="Google Maps のリンクをここに貼り付け…"><button id="locGmaps">取込</button></div>
         <div class="srow"><input type="text" id="fSearch" placeholder="住所・地名・店名で検索…"><button id="locSearch">検索</button></div>
@@ -1124,7 +1121,7 @@
     locStatus();validate();if(form.lat!=null)showTemp(form.lat,form.lng);
   }
   function locStatus(){const st=document.getElementById("locStatus");
-    st.innerHTML=form.lat!=null?`<span class="ok">●</span> 設定済 ${form.lat.toFixed(4)}, ${form.lng.toFixed(4)}`:`<span class="no">●</span> 未設定 — 現在地 / GMapリンク / 検索`;}
+    st.innerHTML=form.lat!=null?`<span class="ok">●</span> 設定済 ${form.lat.toFixed(4)}, ${form.lng.toFixed(4)}`:`<span class="no">●</span> 未設定 — GMapリンク貼付 / 住所検索`;}
   function setLatLng(lat,lng){form.lat=lat;form.lng=lng;locStatus();showTemp(lat,lng);
     const code=detectRegion(lat,lng);form.region=code;const sel=document.getElementById("fRegion");if(sel)sel.value=code;
     const a=airOf(code);validate();toast("位置を設定 → 最寄空港「"+code+" "+a.city+"」");}
@@ -1574,8 +1571,6 @@
     document.getElementById("fName").addEventListener("focus",()=>{if(document.getElementById("fName").value.trim().length>=2)scheduleAC();});
     document.getElementById("fRegion").addEventListener("change",e=>form.region=e.target.value);
     document.getElementById("fDelivery").addEventListener("change",e=>form.delivery=e.target.checked);
-    document.getElementById("locHere").onclick=()=>{if(!navigator.geolocation){toast("位置情報が使えません");return;}toast("現在地を取得中…");
-      navigator.geolocation.getCurrentPosition(p=>{setLatLng(p.coords.latitude,p.coords.longitude);map.setView(dispLL(p.coords.latitude,p.coords.longitude),15);},()=>toast("現在地を取得できません"));};
     document.getElementById("locSearch").onclick=()=>{const q=document.getElementById("fSearch").value.trim();if(q)geocode(q);};
     document.getElementById("fSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const q=e.target.value.trim();if(q)geocode(q);}});
     document.getElementById("locGmaps").onclick=applyGmaps;
