@@ -1146,7 +1146,7 @@
     const qm=s.match(/[?&](?:q|query|destination|daddr)=([^&]+)/);
     if(qm){let qt;try{qt=decodeURIComponent(qm[1].replace(/\+/g," ")).trim();}catch(e){qt=qm[1].replace(/\+/g," ").trim();}
       if(qt&&!/^-?\d+\.\d+\s*,/.test(qt)){
-        const nm=name||((qt.match(/^(.*?)\s*\d/)||[])[1]||"").trim()||null;
+        const nm=name||((qt.match(/^(.*?)\s*\d/)||[])[1]||"").replace(/[,、\s]+$/,"").trim()||null;
         return{query:qt,name:nm};
       }}
     return name?{name}:null;}
