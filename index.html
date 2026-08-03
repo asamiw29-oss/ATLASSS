@@ -1000,7 +1000,7 @@
         body:JSON.stringify(Object.assign({token:EMBED_CFG.token||""},payload))});
       const txt=await res.text();
       let j;try{j=JSON.parse(txt);}catch(e){return{ok:false,error:"bad response",unknown:false};}
-      return{ok:!!j.ok,error:j.error||"",action:j.action||"",unknown:false};
+      return{ok:!!j.ok,error:j.error||"",action:j.action||"",url:j.url||"",unknown:false};
     }catch(e){
       // Blocked, timed out or offline: we genuinely cannot tell whether it landed.
       return{ok:false,error:String(e&&e.message||e),unknown:true};
@@ -1148,9 +1148,23 @@
     let name=null;const pm=s.match(/\/place\/([^\/@?]+)/);if(pm){try{name=decodeURIComponent(pm[1].replace(/\+/g," ")).trim();}catch(e){name=pm[1].replace(/\+/g," ").trim();}}
     let c=s.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)||s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)||s.match(/[?&](?:q|query|ll|destination|daddr)=(-?\d+\.\d+),(-?\d+\.\d+)/);
     if(c)return{lat:+c[1],lng:+c[2],name};return name?{name}:null;}
-  function applyGmaps(){const inp=document.getElementById("fGmaps");const res=parseGmaps(inp.value);
+  // maps.app.goo.gl / goo.gl/maps can't be expanded in the browser (CORS), so we
+  // ask the Apps Script to follow the redirects and hand back the full URL, then
+  // re-parse that. Returns a parsed {lat,lng,name} or a reason it could not.
+  function shortUrl(s){const m=String(s).match(/https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps)\/\S+/i);return m?m[0]:null;}
+  async function expandShort(s){
+    const u=shortUrl(s);if(!u)return{err:"no-short"};
+    if(!getCfg().apps)return{err:"no-endpoint"};
+    const r=await callGAS({action:"resolve",url:u});
+    if(!r.ok||!r.url)return{err:r.unknown?"offline":"failed"};
+    const p=parseGmaps(r.url);
+    return(p&&p.lat!=null)?{res:p}:{err:"no-coords"};
+  }
+  async function applyGmaps(){const inp=document.getElementById("fGmaps");let res=parseGmaps(inp.value);
     if(!res){toast("リンクから座標を取得できませんでした");return;}
-    if(res.short){toast("短縮リンクは一度開いて完全なURLを貼り付けてください");return;}
+    if(res.short){toast("短縮リンクを展開中…");const e=await expandShort(inp.value);
+      if(e.err){toast(e.err==="no-endpoint"?"短縮リンクは一度開いて完全URLを貼り付けてください":"短縮リンクを展開できませんでした");return;}
+      res=e.res;}
     if(res.lat==null){toast("座標が見つかりません（@lat,lng を含むURLを）");return;}
     setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
     const n=document.getElementById("fName");if(res.name&&!n.value.trim())n.value=res.name;validate();inp.value="";}
@@ -1286,7 +1300,10 @@
     const s=txt.trim();
     const res=parseGmaps(s);
     if(res){
-      if(res.short){toast("短縮リンクは開いて完全URLをコピーしてください");return;}
+      if(res.short){toast("短縮リンクを展開中…");const e=await expandShort(s);
+        if(e.res){res=e.res;}
+        else{toast(e.err==="no-endpoint"?"短縮リンクは開いて完全URLをコピーしてください":"短縮リンクを展開できませんでした");return;}
+      }
       if(res.lat!=null){
         setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
         const n=document.getElementById("fName");
@@ -1410,6 +1427,8 @@
 "    var data = JSON.parse(e.postData.contents);\n"+
 "    if (String(data.token || '') !== TOKEN) return out({ok:false, error:'unauthorized'});\n"+
 "\n"+
+"    if (data.action === 'resolve') return resolveShort_(String(data.url || ''));\n"+
+"\n"+
 "    var sh = sheet_();\n"+
 "    var headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];\n"+
 "    var idCol = headers.indexOf('id') + 1;\n"+
@@ -1453,6 +1472,32 @@
 "function sheet_(){\n"+
 "  var ss = SpreadsheetApp.getActiveSpreadsheet();\n"+
 "  return ss.getSheetByName('stores') || ss.getSheets()[0];\n"+
+"}\n"+
+"\n"+
+"// Follow a Google Maps short link's redirects and return the full URL, so the\n"+
+"// app can read @lat,lng from it (the browser can't do this due to CORS).\n"+
+"function resolveShort_(url){\n"+
+"  if (!/^https?:\\/\\//i.test(url)) return out({ok:false, error:'bad url'});\n"+
+"  try{\n"+
+"    var cur = url;\n"+
+"    for (var i = 0; i < 6; i++){\n"+
+"      var resp = UrlFetchApp.fetch(cur, {followRedirects:false, muteHttpExceptions:true});\n"+
+"      var code = resp.getResponseCode();\n"+
+"      if (code < 300 || code >= 400) break;\n"+
+"      var h = resp.getAllHeaders();\n"+
+"      var loc = h['Location'] || h['location'];\n"+
+"      if (!loc) break;\n"+
+"      var cm = String(loc).match(/[?&](?:continue|url)=([^&]+)/);\n"+  // step through consent interstitials
+"      cur = cm ? decodeURIComponent(cm[1]) : loc;\n"+
+"    }\n"+
+"    var hasCoords = /@-?\\d+\\.\\d+,-?\\d+\\.\\d+|!3d-?\\d+\\.\\d+!4d-?\\d+\\.\\d+/.test(cur);\n"+
+"    if (!hasCoords){\n"+  // coords weren't in the URL — pull them from the page body
+"      var body = UrlFetchApp.fetch(cur, {followRedirects:true, muteHttpExceptions:true}).getContentText();\n"+
+"      var bm = body.match(/!3d(-?\\d+\\.\\d+)!4d(-?\\d+\\.\\d+)/) || body.match(/@(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)/);\n"+
+"      if (bm) cur += (cur.indexOf('?')<0?'?':'&') + 'q=' + bm[1] + ',' + bm[2];\n"+
+"    }\n"+
+"    return out({ok:true, url:cur});\n"+
+"  }catch(err){ return out({ok:false, error:String(err)}); }\n"+
 "}\n"+
 "\n"+
 "function findRow_(sh, idCol, id){\n"+
