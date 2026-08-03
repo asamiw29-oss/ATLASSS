@@ -1315,9 +1315,20 @@
 
   async function pasteFromClip(){
     let txt="";
-    try{if(navigator.clipboard&&navigator.clipboard.readText){txt=await navigator.clipboard.readText();}}
-    catch(e){toast("貼り付けを許可してください（ブラウザ設定）");return;}
-    if(!txt||!txt.trim()){toast("クリップボードが空です");return;}
+    try{
+      if(navigator.clipboard&&navigator.clipboard.readText){
+        // iOS can leave this pending forever if the paste permission UI is dismissed.
+        txt=await Promise.race([navigator.clipboard.readText(),
+          new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),2500))]);
+      }
+    }catch(e){}
+    if(!txt||!txt.trim()){
+      // Clipboard read is blocked on many mobile browsers — steer to the manual field.
+      const f=document.getElementById("fGmaps");
+      if(f){f.focus();try{f.scrollIntoView({block:"center"});}catch(e){}}
+      toast("下の「リンクを貼り付け」欄に貼って「取込」を押してください");
+      return;
+    }
     const s=txt.trim();
     const res=parseGmaps(s);
     if(res){
