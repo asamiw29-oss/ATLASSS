@@ -1158,6 +1158,20 @@
     }catch(e){}finally{clearTimeout(timer);}return null;}
   // Nominatim dislikes a leading business name, so geocode from the first street number.
   function addrFromQuery(q){const m=q.match(/\d.*/);return m?m[0]:q;}
+  // Trailing localized country word (e.g. "タイ" / "アメリカ合衆国") trips Nominatim up.
+  function stripCountry(s){return s.replace(/[ 　][ぁ-んァ-ヶ一-龠]+$/,"").trim();}
+  // Google's ?q= text varies a lot, so try several shapes and take the first hit.
+  function geoCandidates(q){
+    const out=[],add=c=>{c=stripCountry(c);if(c&&out.indexOf(c)<0)out.push(c);};
+    add((q.match(/\d.*/)||[q])[0]);                                  // from first street number
+    if(q.indexOf(",")>=0)add(q.slice(q.indexOf(",")+1).trim());      // drop the "name number" prefix
+    add(q);                                                          // whole thing
+    return out;
+  }
+  async function geocodeQuery(q){
+    for(const c of geoCandidates(q)){const g=await geocodeOne(c);if(g)return g;}
+    return null;
+  }
   // maps.app.goo.gl / goo.gl/maps can't be expanded in the browser (CORS), so we
   // ask the Apps Script to follow the redirects and hand back the full URL, then
   // re-parse that. Returns a parsed {lat,lng,name} or a reason it could not.
@@ -1171,7 +1185,7 @@
     if(p&&p.lat!=null)return{res:p};
     // No coords in the resolved URL — geocode the address text it carried.
     if(p&&p.query){
-      const geo=await geocodeOne(addrFromQuery(p.query))||await geocodeOne(p.query);
+      const geo=await geocodeQuery(p.query);
       if(geo)return{res:{lat:geo.lat,lng:geo.lng,name:p.name}};
     }
     // Couldn't get coords — hand back whatever text we learned so the caller can pre-fill.
