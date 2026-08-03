@@ -187,6 +187,7 @@
   .pasteBtn:hover{background:var(--brass-d)}
   .pasteBtn .ico{font-size:14px}
   .pasteHint{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);text-align:center;margin:-8px 0 12px;letter-spacing:.02em;line-height:1.5}
+  .locHint{font-family:var(--mono);font-size:9.5px;color:var(--ink-3);margin:2px 0 6px;letter-spacing:.02em;line-height:1.5}
   .detailsTog{background:none;border:none;color:var(--brass-d);font-family:var(--mono);font-size:10px;letter-spacing:.14em;padding:8px 0;cursor:pointer;display:flex;align-items:center;gap:6px;margin-bottom:4px}
   .detailsTog .caret{color:var(--brass);transition:transform .2s}
   .detailsTog.open .caret{transform:rotate(90deg)}
@@ -305,8 +306,6 @@
 <div class="modal" id="modal">
   <div class="m-head"><span class="grip"></span><h2 id="mTitle">お店を追加</h2><button class="close" id="mClose">✕</button></div>
   <div class="m-body">
-    <button class="pasteBtn" id="pasteFromClip" type="button"><span class="ico">📋</span> クリップボードから貼り付けて反映</button>
-    <div class="pasteHint">Google Maps で「共有 → リンクをコピー」→ ここをタップ</div>
     <div class="fld nameFld">
       <label>店名 / NAME <span class="acHint" id="acHint">— 入力すると候補が出ます</span></label>
       <input type="text" id="fName" placeholder="例：Tiong Bahru Bakery…" autocomplete="off">
@@ -317,7 +316,8 @@
       <div class="loc">
         <div class="status" id="locStatus"><span class="no">●</span> 未設定 — 地図タップ / 現在地 / 検索 / GMapリンク</div>
         <div class="loc-btns"><button id="locTap">地図をタップ</button><button id="locHere">現在地</button></div>
-        <div class="srow"><input type="text" id="fGmaps" placeholder="Google Mapsのリンクを貼り付け…"><button id="locGmaps">取込</button></div>
+        <div class="locHint">Google Maps で「共有 → リンクをコピー」して、下の欄に貼り付け → 取込</div>
+        <div class="srow"><input type="text" id="fGmaps" inputmode="url" autocomplete="off" placeholder="Google Maps のリンクをここに貼り付け…"><button id="locGmaps">取込</button></div>
         <div class="srow"><input type="text" id="fSearch" placeholder="住所・地名・店名で検索…"><button id="locSearch">検索</button></div>
         <ul class="geoms" id="geoms"></ul>
       </div>
@@ -1568,7 +1568,6 @@
     document.getElementById("mClose").onclick=closeM;scrim.onclick=closeM;
     document.getElementById("mSave").onclick=saveSpot;
     document.getElementById("mDelete").onclick=()=>{if(editing&&confirm("この店を削除しますか？")){delSpot(editing);closeM();}};
-    document.getElementById("pasteFromClip").onclick=pasteFromClip;
     document.getElementById("togDetails").onclick=()=>{
       document.getElementById("togDetails").classList.toggle("open");
       document.getElementById("detailsBox").classList.toggle("open");
