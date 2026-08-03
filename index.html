@@ -159,10 +159,6 @@
   .loc .status .ok{color:#5f8a6b}.loc .status .no{color:#a8493f}
   .loc-btns{display:flex;gap:7px;flex-wrap:wrap}
   .loc-btns button{font-size:10px;letter-spacing:.06em;border:1px solid var(--line-2);border-radius:4px;padding:8px 10px;background:var(--paper);color:var(--ink-2)}
-  .loc-btns button.armed{background:var(--navy);color:var(--paper);border-color:var(--navy)}
-  .tapBanner{position:fixed;top:0;left:0;right:0;z-index:2500;background:var(--navy);color:var(--paper);display:none;align-items:center;justify-content:space-between;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 12px;font-family:var(--mono);font-size:12px;letter-spacing:.03em;box-shadow:0 2px 12px rgba(20,31,43,.35)}
-  .tapBanner.on{display:flex}
-  .tapBanner button{flex:0 0 auto;background:var(--paper);color:var(--navy);border:none;border-radius:16px;padding:7px 15px;font-family:var(--mono);font-size:12px;letter-spacing:.03em}
   .srow{display:flex;gap:6px;margin-top:8px}
   .srow input{flex:1;background:var(--paper);border:1px solid var(--line-2);border-radius:4px;padding:8px 10px;font-size:13px}
   .srow button{flex:0 0 auto;font-size:10px;letter-spacing:.06em;border:1px solid var(--line-2);border-radius:4px;padding:0 12px;background:var(--paper)}
@@ -305,7 +301,6 @@
   </div>
 </div>
 
-<div class="tapBanner" id="tapBanner"><span>📍 地図をタップして位置を指定</span><button id="tapCancel" type="button">やめる</button></div>
 <div class="scrim" id="scrim"></div>
 <div class="modal" id="modal">
   <div class="m-head"><span class="grip"></span><h2 id="mTitle">お店を追加</h2><button class="close" id="mClose">✕</button></div>
@@ -318,8 +313,8 @@
     <div class="fld">
       <label>位置 / LOCATION</label>
       <div class="loc">
-        <div class="status" id="locStatus"><span class="no">●</span> 未設定 — 地図タップ / 現在地 / 検索 / GMapリンク</div>
-        <div class="loc-btns"><button id="locTap">地図をタップ</button><button id="locHere">現在地</button></div>
+        <div class="status" id="locStatus"><span class="no">●</span> 未設定 — 現在地 / GMapリンク / 検索</div>
+        <div class="loc-btns"><button id="locHere">現在地</button></div>
         <div class="locHint">Google Maps で「共有 → リンクをコピー」して、下の欄に貼り付け → 取込</div>
         <div class="srow"><input type="text" id="fGmaps" inputmode="url" autocomplete="off" placeholder="Google Maps のリンクをここに貼り付け…"><button id="locGmaps">取込</button></div>
         <div class="srow"><input type="text" id="fSearch" placeholder="住所・地名・店名で検索…"><button id="locSearch">検索</button></div>
@@ -723,7 +718,7 @@
 
   let stores=loadCache();
   let fMacro="ALL",fAirport="ALL",fCat="ALL",q="",filtersOpen=false;
-  let map,layer,markers=[],temp=null,tapArmed=false,editing=null,zoomLabels=false;
+  let map,layer,markers=[],temp=null,editing=null,zoomLabels=false;
   let form=blank();
   function blank(){return{region:getLastAir(),cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:""};}
 
@@ -776,7 +771,6 @@
       if(z<5&&!map.hasLayer(tileLo)){map.removeLayer(tileHi);tileLo.addTo(map);}
       const want=z>=13;if(want!==zoomLabels){zoomLabels=want;markers.forEach(m=>{if(want)m.openTooltip();else m.closeTooltip();});}
     });
-    map.on("click",e=>{if(!tapArmed)return;setLatLng(e.latlng.lat,wrapLng(e.latlng.lng));endTap(true);});
   }
   function icon(color,t){return L.divIcon({className:"",iconSize:[16,20],iconAnchor:[8,19],popupAnchor:[0,-18],
     html:`<div class="pin${t?' temp':''}" style="background:${color}"></div>`});}
@@ -1067,7 +1061,7 @@
 
   const scrim=document.getElementById("scrim"),modal=document.getElementById("modal");
   function openM(){scrim.classList.add("on");modal.classList.add("on");}
-  function closeM(){scrim.classList.remove("on");modal.classList.remove("on");disarm();clearTemp();document.getElementById("geoms").innerHTML="";closeAC();}
+  function closeM(){scrim.classList.remove("on");modal.classList.remove("on");clearTemp();document.getElementById("geoms").innerHTML="";closeAC();}
   function fillSelects(){
     const sel=document.getElementById("fRegion");sel.innerHTML="";
     MACRO.forEach(m=>{
@@ -1130,22 +1124,12 @@
     locStatus();validate();if(form.lat!=null)showTemp(form.lat,form.lng);
   }
   function locStatus(){const st=document.getElementById("locStatus");
-    st.innerHTML=form.lat!=null?`<span class="ok">●</span> 設定済 ${form.lat.toFixed(4)}, ${form.lng.toFixed(4)}`:`<span class="no">●</span> 未設定 — 地図タップ / 現在地 / 検索 / GMapリンク`;}
+    st.innerHTML=form.lat!=null?`<span class="ok">●</span> 設定済 ${form.lat.toFixed(4)}, ${form.lng.toFixed(4)}`:`<span class="no">●</span> 未設定 — 現在地 / GMapリンク / 検索`;}
   function setLatLng(lat,lng){form.lat=lat;form.lng=lng;locStatus();showTemp(lat,lng);
     const code=detectRegion(lat,lng);form.region=code;const sel=document.getElementById("fRegion");if(sel)sel.value=code;
     const a=airOf(code);validate();toast("位置を設定 → 最寄空港「"+code+" "+a.city+"」");}
   function showTemp(lat,lng){clearTemp();temp=L.marker(dispLL(lat,lng),{icon:icon("#1C2A3A",true),zIndexOffset:1000}).addTo(map);}
   function clearTemp(){if(temp){map.removeLayer(temp);temp=null;}}
-  function arm(){tapArmed=true;document.getElementById("locTap").classList.add("armed");
-    // The add form covers the map, so tuck it away and show a banner while picking.
-    scrim.classList.remove("on");modal.classList.remove("on");
-    document.getElementById("tapBanner").classList.add("on");
-    try{map.invalidateSize();}catch(e){}}
-  function endTap(reopen){tapArmed=false;const b=document.getElementById("locTap");if(b)b.classList.remove("armed");
-    document.getElementById("tapBanner").classList.remove("on");
-    if(reopen)openM();}
-  function disarm(){tapArmed=false;const b=document.getElementById("locTap");if(b)b.classList.remove("armed");
-    const bn=document.getElementById("tapBanner");if(bn)bn.classList.remove("on");}
 
   async function geocode(q){const box=document.getElementById("geoms");box.innerHTML="<li>検索中…</li>";
     try{const r=await fetch("https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q="+encodeURIComponent(q),{headers:{"Accept":"application/json"}});
@@ -1590,8 +1574,6 @@
     document.getElementById("fName").addEventListener("focus",()=>{if(document.getElementById("fName").value.trim().length>=2)scheduleAC();});
     document.getElementById("fRegion").addEventListener("change",e=>form.region=e.target.value);
     document.getElementById("fDelivery").addEventListener("change",e=>form.delivery=e.target.checked);
-    document.getElementById("locTap").onclick=()=>{tapArmed?endTap(true):arm();};
-    document.getElementById("tapCancel").onclick=()=>endTap(true);
     document.getElementById("locHere").onclick=()=>{if(!navigator.geolocation){toast("位置情報が使えません");return;}toast("現在地を取得中…");
       navigator.geolocation.getCurrentPosition(p=>{setLatLng(p.coords.latitude,p.coords.longitude);map.setView(dispLL(p.coords.latitude,p.coords.longitude),15);},()=>toast("現在地を取得できません"));};
     document.getElementById("locSearch").onclick=()=>{const q=document.getElementById("fSearch").value.trim();if(q)geocode(q);};
