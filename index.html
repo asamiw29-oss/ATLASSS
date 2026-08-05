@@ -241,13 +241,28 @@
 
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(18px);background:var(--navy);color:var(--paper);font-family:var(--mono);font-size:11px;letter-spacing:.05em;padding:11px 16px;border-radius:5px;z-index:2000;opacity:0;transition:.25s;pointer-events:none;max-width:84vw;text-align:center;line-height:1.5}
   .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
-  .welcome{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(22px);width:min(90vw,360px);background:var(--navy);color:var(--paper);border:1px solid var(--brass);border-radius:9px;padding:15px 18px;z-index:2100;opacity:0;transition:opacity .4s ease,transform .4s ease;box-shadow:0 10px 34px rgba(20,31,43,.4);cursor:pointer}
-  .welcome.on{opacity:1;transform:translateX(-50%) translateY(0)}
-  .welcome .wk{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--brass);margin-bottom:7px}
-  .welcome .wk .dot{width:5px;height:5px;border-radius:50%;background:var(--brass)}
-  .welcome .wm{font-size:13px;line-height:1.65;letter-spacing:.02em}
-  .welcome .wm b{color:var(--brass);font-weight:600}
-  .welcome .wx{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--brass-d);margin-top:9px;text-align:right}
+  .tut-note{margin:0 0 12px;padding:13px 15px;background:var(--paper-2);border:1px solid var(--line);border-radius:10px;text-align:center;font-size:12.5px;line-height:1.8;color:var(--ink)}
+  .tut-note b{color:var(--brass-d);font-weight:600}
+  .tutScrim{position:fixed;inset:0;background:rgba(20,31,43,.62);z-index:3100;display:none;align-items:center;justify-content:center;padding:20px}
+  .tutScrim.on{display:flex}
+  .tut{width:min(94vw,382px);max-height:88dvh;overflow-y:auto;background:var(--paper);border-radius:14px;box-shadow:0 18px 60px rgba(20,31,43,.5);animation:tutIn .32s cubic-bezier(.2,.8,.2,1)}
+  @keyframes tutIn{from{transform:translateY(18px) scale(.98);opacity:0}to{transform:none;opacity:1}}
+  .tut-hd{background:var(--navy);color:var(--paper);padding:21px 22px 18px;border-radius:14px 14px 0 0;text-align:center}
+  .tut-hd .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.24em;color:var(--brass);margin-bottom:8px}
+  .tut-hd h2{font-family:var(--serif);font-weight:600;font-size:20px;margin:0;letter-spacing:.02em}
+  .tut-hd p{font-size:12px;color:#c6bda9;margin:8px 0 0;line-height:1.65}
+  .tut-bd{padding:6px 20px}
+  .tut-step{display:flex;gap:13px;padding:15px 0;border-bottom:1px solid var(--line)}
+  .tut-step:last-child{border-bottom:none}
+  .tut-step .no{flex:0 0 auto;width:25px;height:25px;border-radius:50%;background:var(--brass);color:#fff;font-family:var(--mono);font-size:12px;display:flex;align-items:center;justify-content:center}
+  .tut-step .tx{flex:1;min-width:0}
+  .tut-step .tx .t{display:block;font-weight:600;font-size:14px;color:var(--ink);margin-bottom:4px}
+  .tut-step .tx .d{display:block;font-size:12.5px;line-height:1.7;color:var(--ink-2)}
+  .tut-step .tx .d b{color:var(--brass-d);font-weight:600}
+  .tico{display:inline-flex;width:16px;height:16px;vertical-align:-3px;margin:0 1px;color:var(--navy)}
+  .tut-ft{padding:6px 20px 20px}
+  .tut-btn{width:100%;background:var(--navy);color:var(--paper);font-family:var(--mono);font-size:12px;letter-spacing:.12em;border:none;border-radius:8px;padding:14px;cursor:pointer;transition:background .15s}
+  .tut-btn:hover{background:var(--navy-2)}
   input[type=file]{display:none}
 
   .splash{position:fixed;inset:0;background:var(--navy);z-index:3000;display:flex;align-items:center;justify-content:center;transition:opacity .55s ease}
@@ -269,10 +284,36 @@
 
 <div class="splash" id="splash"><img src="splash-logo-white.png" alt="Atlas — Layover Map"></div>
 
-<div class="welcome" id="welcome">
-  <div class="wk"><span class="dot"></span>WELCOME</div>
-  <div class="wm">あなたのおすすめの<b>1軒</b>が、みんなの<b>Layover</b>を楽しくする。<br>ぜひ、お店の登録よろしくお願いします☺️</div>
-  <div class="wx">タップで閉じる</div>
+<div class="tutScrim" id="tutScrim">
+  <div class="tut" id="tut">
+    <div class="tut-hd">
+      <div class="k">HOW TO USE</div>
+      <h2>Atlas へようこそ</h2>
+      <p>世界中のCREWのおすすめが集まる、レイオーバーのためのお店マップ。</p>
+    </div>
+    <div class="tut-bd">
+      <div class="tut-step">
+        <div class="no">1</div>
+        <div class="tx">
+          <span class="t">ホーム画面に追加</span>
+          <span class="d" id="tutHomeIOS" style="display:none">Safari下部の共有ボタン <svg class="tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4M6 12v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/></svg> を押して、<b>「ホーム画面に追加」</b>を選ぶと、アプリのように開けます。</span>
+          <span class="d" id="tutHomeAnd" style="display:none">ブラウザのメニュー <svg class="tico" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg> を開いて、<b>「ホーム画面に追加」</b>を選ぶと、アプリのように開けます。</span>
+          <span class="d" id="tutHomeGen" style="display:none">ブラウザのメニューから <b>「ホーム画面に追加」/「インストール」</b>を選ぶと、アプリのように開けます。</span>
+        </div>
+      </div>
+      <div class="tut-step">
+        <div class="no">2</div>
+        <div class="tx">
+          <span class="t">お店を追加</span>
+          <span class="d"><b>＋ お店を追加</b> から、あなたのおすすめの1軒を登録。Google マップのリンクを貼るだけでも場所を取り込めます。</span>
+        </div>
+      </div>
+    </div>
+    <div class="tut-ft">
+      <div class="tut-note">あなたのおすすめの<b>1軒</b>が、みんなの<b>Layover</b>を楽しくする。<br>ぜひ、お店の登録よろしくお願いします☺️</div>
+      <button class="tut-btn" id="tutClose">はじめる</button>
+    </div>
+  </div>
 </div>
 
 <header>
@@ -415,7 +456,7 @@
   };
   // ============================================================
 
-  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1", LAST_AIR_KEY="atlas.lastAir.v1", QUEUE_KEY="atlas.queue.v1", WELCOME_KEY="atlas.welcome.v1";
+  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1", LAST_AIR_KEY="atlas.lastAir.v1", QUEUE_KEY="atlas.queue.v1", TUT_KEY="atlas.tutorial.v1";
   // Airport shown before a location is picked; detectRegion overwrites it once one is.
   const DEFAULT_AIR="LAX";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
@@ -1759,15 +1800,22 @@
   if(csvUrl())syncFromSheet(true);
   setTimeout(()=>document.getElementById("splash").classList.add("gone"),1200);
 
-  // First-visit welcome message — shown only once per device.
+  // First-visit onboarding tutorial — shown only once per device.
   (function(){
-    let seen=false;try{seen=!!localStorage.getItem(WELCOME_KEY);}catch(e){}
+    let seen=false;try{seen=!!localStorage.getItem(TUT_KEY);}catch(e){}
     if(seen)return;
-    const w=document.getElementById("welcome");let hideT;
-    const hide=()=>{w.classList.remove("on");clearTimeout(hideT);};
-    w.addEventListener("click",hide);
-    setTimeout(()=>{w.classList.add("on");hideT=setTimeout(hide,6000);},1900);
-    try{localStorage.setItem(WELCOME_KEY,"1");}catch(e){}
+    try{localStorage.setItem(TUT_KEY,"1");}catch(e){}
+    const ua=navigator.userAgent||"";
+    const isIOS=/iP(hone|ad|od)/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    const isAndroid=/Android/.test(ua);
+    const pick=isIOS?"tutHomeIOS":(isAndroid?"tutHomeAnd":"tutHomeGen");
+    const el=document.getElementById(pick);if(el)el.style.display="";
+    const scr=document.getElementById("tutScrim");
+    let done=false;
+    const close=()=>{if(done)return;done=true;scr.classList.remove("on");};
+    document.getElementById("tutClose").addEventListener("click",close);
+    scr.addEventListener("click",e=>{if(e.target===scr)close();});
+    setTimeout(()=>{if(!done)scr.classList.add("on");},1700);
   })();
 })();
 </script>
