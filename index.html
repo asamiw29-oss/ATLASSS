@@ -1801,11 +1801,13 @@
   if(csvUrl())syncFromSheet(true);
   setTimeout(()=>document.getElementById("splash").classList.add("gone"),1200);
 
-  // First-visit onboarding tutorial — shown only once per device.
+  // Onboarding tutorial — shown on the first visit, then at most once a month.
   (function(){
-    let seen=false;try{seen=!!localStorage.getItem(TUT_KEY);}catch(e){}
-    if(seen)return;
-    try{localStorage.setItem(TUT_KEY,"1");}catch(e){}
+    const MONTH=30*24*60*60*1000;
+    let last=0;try{last=parseInt(localStorage.getItem(TUT_KEY),10)||0;}catch(e){}
+    const now=Date.now();
+    if(last&&now-last<MONTH)return;
+    try{localStorage.setItem(TUT_KEY,String(now));}catch(e){}
     const ua=navigator.userAgent||"";
     const isIOS=/iP(hone|ad|od)/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
     const isAndroid=/Android/.test(ua);
