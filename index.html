@@ -1678,9 +1678,14 @@
     document.getElementById("fSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const q=e.target.value.trim();if(q)geocode(q);}});
     document.getElementById("locGmaps").onclick=applyGmaps;
     document.getElementById("fGmaps").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();applyGmaps();}});
-    // ---- Offline support (https only; a no-op on file://) ----
-    if("serviceWorker" in navigator&&location.protocol==="https:"){
-      navigator.serviceWorker.register("sw.js").catch(()=>{});
+    // Offline support removed: the service worker was causing stale-cache issues
+    // (app needing a full restart to work). Actively tear down any SW + its caches
+    // so the app always loads fresh from the network.
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
+    }
+    if(window.caches&&caches.keys){
+      caches.keys().then(ks=>ks.forEach(k=>{if(k.indexOf("atlas-")===0)caches.delete(k);})).catch(()=>{});
     }
     function showOnline(){
       updateSync();
