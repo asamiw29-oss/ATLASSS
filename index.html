@@ -15,10 +15,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://unpkg.com" crossorigin>
-<link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
-<link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossorigin>
-<link rel="preconnect" href="https://c.basemaps.cartocdn.com" crossorigin>
-<link rel="preconnect" href="https://d.basemaps.cartocdn.com" crossorigin>
+<link rel="preconnect" href="https://server.arcgisonline.com" crossorigin>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -809,18 +806,22 @@
   const dispLng=lng=>lng<-30?lng+360:lng;
   const wrapLng=lng=>((lng+180)%360+360)%360-180;
   const dispLL=(lat,lng)=>[lat,dispLng(lng)];
-  let tileLo,tileHi;
+  let baseLayer,labelLayer;
   function initMap(){
     map=L.map("map",{zoomControl:true,minZoom:2}).setView(HOME_VIEW.center,HOME_VIEW.zoom);
-    const attr="© OpenStreetMap © CARTO";
-    tileLo=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:attr,subdomains:"abcd"});
-    tileHi=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:attr,subdomains:"abcd"});
-    (map.getZoom()>=5?tileHi:tileLo).addTo(map);
+    // Esri's light-grey canvas: same clean look as before but needs no API key
+    // (CARTO's keyless tiles started showing an "API KEY REQUIRED" watermark).
+    const attr="Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors";
+    const ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/";
+    baseLayer=L.tileLayer(ESRI+"Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:19,attribution:attr});
+    labelLayer=L.tileLayer(ESRI+"Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,maxZoom:19});
+    baseLayer.addTo(map);                       // base always on
+    if(map.getZoom()>=5)labelLayer.addTo(map);  // place names only once zoomed in
     layer=L.layerGroup().addTo(map);
     map.on("zoomend",()=>{
       const z=map.getZoom();
-      if(z>=5&&!map.hasLayer(tileHi)){map.removeLayer(tileLo);tileHi.addTo(map);}
-      if(z<5&&!map.hasLayer(tileLo)){map.removeLayer(tileHi);tileLo.addTo(map);}
+      if(z>=5&&!map.hasLayer(labelLayer))labelLayer.addTo(map);
+      if(z<5&&map.hasLayer(labelLayer))map.removeLayer(labelLayer);
       const want=z>=13;if(want!==zoomLabels){zoomLabels=want;markers.forEach(m=>{if(want)m.openTooltip();else m.closeTooltip();});}
     });
   }
