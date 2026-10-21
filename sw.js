@@ -2,7 +2,7 @@
    Bump VERSION whenever the caching rules below change; the old caches are
    dropped on activate. index.html itself is NOT versioned here — it is served
    network-first so a fresh Vercel deploy always wins while online. */
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL = "atlas-shell-" + VERSION;
 const TILES = "atlas-tiles-" + VERSION;
 const DATA  = "atlas-data-"  + VERSION;
@@ -27,7 +27,7 @@ const SHELL_ASSETS = [
 const TILE_LIMIT = 800;
 const TILE_TRIM  = 200;
 
-const isTile  = u => u.hostname === "server.arcgisonline.com";
+const isTile  = u => u.hostname === "tiles.stadiamaps.com";
 const isSheet = u => u.hostname === "docs.google.com" && u.pathname.includes("/gviz/");
 const isFont  = u => u.hostname === "fonts.googleapis.com" || u.hostname === "fonts.gstatic.com";
 const isCDN   = u => u.hostname === "unpkg.com";
