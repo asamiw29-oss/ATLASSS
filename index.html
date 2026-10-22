@@ -472,7 +472,12 @@
   };
   // ============================================================
 
-  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1", LAST_AIR_KEY="atlas.lastAir.v1", QUEUE_KEY="atlas.queue.v1", TUT_KEY="atlas.tutorial.v1";
+  const CACHE_KEY="atlas.cache.v1", CFG_KEY="atlas.cfg.v1", LAST_REG_KEY="atlas.lastReg.v1", LAST_ROLE_KEY="atlas.lastRole.v1", LAST_AIR_KEY="atlas.lastAir.v1", QUEUE_KEY="atlas.queue.v1", TUT_KEY="atlas.tutorial.v1", TOUCH_KEY="atlas.touch.v1";
+  // Per-store "last touched on this device" times, so your own adds/edits float to
+  // the top of their airport group without needing any backend change.
+  let touched=(function(){try{return JSON.parse(localStorage.getItem(TOUCH_KEY))||{};}catch(e){return{};}})();
+  function touch(id){try{touched[id]=new Date().toISOString();localStorage.setItem(TOUCH_KEY,JSON.stringify(touched));}catch(e){}}
+  function activityOf(s){const t=touched[s.id]||"",c=s.created_at||"";return t>c?t:c;}
   // Airport shown before a location is picked; detectRegion overwrites it once one is.
   const DEFAULT_AIR="LAX";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
@@ -844,9 +849,14 @@
 
   function renderMarkers(){
     layer.clearLayers();markers=[];
-    filtered().forEach(s=>{
+    const fs=filtered();
+    // Rank by activity so newer / recently-edited pins stack on top when they overlap.
+    const rank=new Map();
+    fs.slice().sort((a,b)=>activityOf(a).localeCompare(activityOf(b)))
+      .forEach((s,i)=>rank.set(s.id,i));
+    fs.forEach(s=>{
       const cats=s.categories||["other"];const c=catOf(cats[0]);
-      const m=L.marker(dispLL(s.lat,s.lng),{icon:icon(c.color)}).addTo(layer);
+      const m=L.marker(dispLL(s.lat,s.lng),{icon:icon(c.color),zIndexOffset:rank.get(s.id)||0}).addTo(layer);
       m._sid=s.id;
       m.bindTooltip(esc(s.name),{permanent:true,direction:"top",offset:[0,-16],className:"name"});
       if(!zoomLabels)m.closeTooltip();
@@ -978,7 +988,7 @@
     try{map.fitBounds(pts,{padding:[60,60],maxZoom:13});}catch(e){}
   }
 
-  const byNew=(a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""));
+  const byNew=(a,b)=>activityOf(b).localeCompare(activityOf(a));
   function listItemEl(s){
     const cats=s.categories||["other"];const c=catOf(cats[0]),a=airOf(s.region);
     const catText=cats.map(cid=>catOf(cid).label).join(" · ");
@@ -1528,11 +1538,12 @@
     }
     if(isEdit){
       const prev=stores.find(s=>s.id===editing);
-      if(prev&&prev.created_at)rec.created_at=prev.created_at;   // keep the original timestamp
+      if(prev&&prev.created_at)rec.created_at=prev.created_at;   // keep the real creation time
       stores=stores.map(s=>s.id===editing?Object.assign({},s,rec):s);
     }else{
       rec._local=true;stores.push(rec);
     }
+    touch(rec.id);   // float this store to the top of its airport group on this device
     saveCache();closeM();render();
     const c=getCfg();
     if(!c.apps){toast((isEdit?"更新":"追加")+"しました（この端末のみ・設定で共同編集を有効化）");return;}
