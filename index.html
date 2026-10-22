@@ -383,9 +383,7 @@
     <div class="fld">
       <label>位置 / LOCATION</label>
       <div class="loc">
-        <div class="status" id="locStatus"><span class="no">●</span> 未設定 — GMapリンク貼付 / 住所検索</div>
-        <div class="locHint">Google Maps で「共有 → リンクをコピー」して、下の欄に貼り付け → 取込</div>
-        <div class="srow"><input type="text" id="fGmaps" inputmode="url" autocomplete="off" placeholder="Google Maps のリンクをここに貼り付け…"><button id="locGmaps">取込</button></div>
+        <div class="status" id="locStatus"><span class="no">●</span> 未設定 — 住所・地名・店名で検索</div>
         <div class="srow"><input type="text" id="fSearch" placeholder="住所・地名・店名で検索…"><button id="locSearch">検索</button></div>
         <ul class="geoms" id="geoms"></ul>
       </div>
@@ -491,6 +489,7 @@
     {id:"fish",label:"魚",color:"#3E5C76"},
     {id:"cafe",label:"カフェ",color:"#C08C7A"},
     {id:"sweets",label:"スイーツ",color:"#D9A0BF"},
+    {id:"bakery",label:"パン屋",color:"#C9A063"},
     {id:"bar",label:"バー",color:"#5A5A7A"},
     {id:"beauty",label:"美容・マッサージ",color:"#8E7AA3"},
     {id:"souvenir",label:"お土産",color:"#9E7E5C"},
@@ -991,7 +990,10 @@
       <div class="name">${esc(s.name)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>`;
-    it.onclick=()=>flyTo(s);return it;
+    // In list view the map is hidden, so the map popup (with its edit button) is
+    // unreachable — open the edit form directly instead of flying the hidden map.
+    it.onclick=()=>{if(document.querySelector(".work").classList.contains("listview"))openEdit(s.id);else flyTo(s);};
+    return it;
   }
   function renderList(){
     const wrap=document.getElementById("list");wrap.innerHTML="";
@@ -1199,7 +1201,7 @@
     document.getElementById("fMemo").value=s.memo||"";
     document.getElementById("fReg").value=s.registrant||"";
     document.getElementById("fDelivery").checked=!!form.delivery;
-    document.getElementById("fSearch").value="";document.getElementById("fGmaps").value="";document.getElementById("geoms").innerHTML="";
+    document.getElementById("fSearch").value="";document.getElementById("geoms").innerHTML="";
     refreshCatUI();refreshRoleUI();
     const hasDetails=!!(s.registrant||form.role);
     document.getElementById("togDetails").classList.toggle("open",hasDetails);
@@ -1207,7 +1209,7 @@
     locStatus();validate();if(form.lat!=null)showTemp(form.lat,form.lng);
   }
   function locStatus(){const st=document.getElementById("locStatus");
-    st.innerHTML=form.lat!=null?`<span class="ok">●</span> 設定済 ${form.lat.toFixed(4)}, ${form.lng.toFixed(4)}`:`<span class="no">●</span> 未設定 — GMapリンク貼付 / 住所検索`;}
+    st.innerHTML=form.lat!=null?`<span class="ok">●</span> 設定済 ${form.lat.toFixed(4)}, ${form.lng.toFixed(4)}`:`<span class="no">●</span> 未設定 — 住所・地名・店名で検索`;}
   function setLatLng(lat,lng){form.lat=lat;form.lng=lng;locStatus();showTemp(lat,lng);
     const code=detectRegion(lat,lng);form.region=code;const sel=document.getElementById("fRegion");if(sel)sel.value=code;
     const a=airOf(code);validate();toast("位置を設定 → 最寄空港「"+code+" "+a.city+"」");}
@@ -1337,7 +1339,8 @@
     brazilian_restaurant:"yoshoku",fine_dining_restaurant:"yoshoku",
     steak_house:"meat",barbecue_restaurant:"meat",yakitori_restaurant:"meat",teppanyaki_restaurant:"meat",
     bar:"bar",wine_bar:"bar",pub:"bar",night_club:"bar",bar_and_grill:"bar",
-    cafe:"cafe",coffee_shop:"cafe",bakery:"cafe",tea_house:"cafe",breakfast_restaurant:"cafe",brunch_restaurant:"cafe",cat_cafe:"cafe",dog_cafe:"cafe",bagel_shop:"cafe",
+    cafe:"cafe",coffee_shop:"cafe",tea_house:"cafe",breakfast_restaurant:"cafe",brunch_restaurant:"cafe",cat_cafe:"cafe",dog_cafe:"cafe",
+    bakery:"bakery",bagel_shop:"bakery",
     dessert_shop:"sweets",dessert_restaurant:"sweets",ice_cream_shop:"sweets",donut_shop:"sweets",candy_store:"sweets",chocolate_shop:"sweets",juice_shop:"sweets",confectionery:"sweets",
     massage:"beauty",spa:"beauty",beauty_salon:"beauty",hair_salon:"beauty",nail_salon:"beauty",wellness_center:"beauty",sauna:"beauty",
     tourist_attraction:"tourism",museum:"tourism",art_gallery:"tourism",park:"tourism",garden:"tourism",zoo:"tourism",aquarium:"tourism",amusement_park:"tourism",historical_landmark:"tourism",historical_place:"tourism",monument:"tourism",church:"tourism",hindu_temple:"tourism",mosque:"tourism",synagogue:"tourism",place_of_worship:"tourism",cultural_center:"tourism",observation_deck:"tourism",
@@ -1711,8 +1714,6 @@
     document.getElementById("fDelivery").addEventListener("change",e=>form.delivery=e.target.checked);
     document.getElementById("locSearch").onclick=()=>{const q=document.getElementById("fSearch").value.trim();if(q)geocode(q);};
     document.getElementById("fSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const q=e.target.value.trim();if(q)geocode(q);}});
-    document.getElementById("locGmaps").onclick=applyGmaps;
-    document.getElementById("fGmaps").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();applyGmaps();}});
     // Offline support removed: the service worker was causing stale-cache issues
     // (app needing a full restart to work). Actively tear down any SW + its caches
     // so the app always loads fresh from the network.
