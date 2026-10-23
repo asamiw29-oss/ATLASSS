@@ -1005,7 +1005,7 @@
       <div class="name">${esc(s.name)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
-      <a class="itgm" href="${gmapUrl}" target="_blank" rel="noopener" aria-label="Google Mapで開く">◉</a>`;
+      <a class="itgm" href="${gmapUrl}" target="_blank" rel="noopener" aria-label="Google Mapで開く"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.4-6.5-10.2A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.8C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg></a>`;
     // In list view the map is hidden, so the map popup (with its edit button) is
     // unreachable — open the edit form directly instead of flying the hidden map.
     it.onclick=()=>{if(document.querySelector(".work").classList.contains("listview"))openEdit(s.id);else flyTo(s);};
