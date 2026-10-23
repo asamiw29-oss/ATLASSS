@@ -1023,11 +1023,17 @@
       base.slice().sort((a,b)=>distOf(a)-distOf(b)).forEach(s=>wrap.appendChild(listItemEl(s)));
       return;
     }
-    // Group by airport, ordered geographically (AIRPORTS order), newest within each.
+    // Group by airport. Groups are ordered so the airport with the most recent
+    // activity (added/edited store) floats to the top; ties fall back to the
+    // geographic AIRPORTS order. Within each group, newest-first via byNew.
     const order=new Map(AIRPORTS.map((a,i)=>[a.code,i]));
     const groups=new Map();
     base.forEach(s=>{if(!groups.has(s.region))groups.set(s.region,[]);groups.get(s.region).push(s);});
-    const codes=[...groups.keys()].sort((x,y)=>(order.has(x)?order.get(x):999)-(order.has(y)?order.get(y):999));
+    const groupAct=code=>groups.get(code).reduce((m,s)=>{const a=activityOf(s);return a>m?a:m;},"");
+    const codes=[...groups.keys()].sort((x,y)=>{
+      const d=groupAct(y).localeCompare(groupAct(x));if(d)return d;
+      return (order.has(x)?order.get(x):999)-(order.has(y)?order.get(y):999);
+    });
     const single=codes.length<=1;
     codes.forEach(code=>{
       if(!single){const a=airOf(code);const h=el("div","listgroup");
