@@ -145,8 +145,9 @@
   .item .sub{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-2);margin:1px 0 3px}
   .item .sub .dot{color:var(--line-2);margin:0 5px}.item .sub .code{color:var(--brass-d)}
   .item .note{font-size:12.5px;color:var(--ink-2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .item .itgm{flex:0 0 auto;align-self:center;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:1px solid var(--brass);border-radius:6px;color:var(--brass-d);text-decoration:none;font-size:15px;transition:background .12s}
-  .item .itgm:hover{background:var(--brass);color:var(--paper)}
+  .item .itgm{flex:0 0 auto;align-self:center;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line-2);border-radius:50%;color:var(--ink-2);text-decoration:none;transition:all .14s}
+  .item .itgm:hover{border-color:var(--brass);color:var(--brass-d)}
+  .item .itgm svg{display:block}
   .empty{text-align:center;color:var(--ink-3);padding:34px 22px;font-family:var(--mono);letter-spacing:.04em;line-height:1.8}
   .empty .big{font-family:var(--serif);font-size:15px;color:var(--ink-2);margin-bottom:5px;letter-spacing:0}
 
@@ -1005,7 +1006,7 @@
       <div class="name">${esc(s.name)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
-      <a class="itgm" href="${gmapUrl}" target="_blank" rel="noopener" aria-label="Google Mapで開く"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.4-6.5-10.2A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.8C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg></a>`;
+      <a class="itgm" href="${gmapUrl}" target="_blank" rel="noopener" aria-label="Google Mapで開く"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5c3.8-4.3 6-7.6 6-11a6 6 0 1 0-12 0c0 3.4 2.2 6.7 6 11z"/><circle cx="12" cy="10.3" r="2.1"/></svg></a>`;
     // In list view the map is hidden, so the map popup (with its edit button) is
     // unreachable — open the edit form directly instead of flying the hidden map.
     it.onclick=()=>{if(document.querySelector(".work").classList.contains("listview"))openEdit(s.id);else flyTo(s);};
