@@ -1889,10 +1889,22 @@
     if(last&&now-last<MONTH)return;
     try{localStorage.setItem(TUT_KEY,String(now));}catch(e){}
     const ua=navigator.userAgent||"";
-    const isIOS=/iP(hone|ad|od)/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    const isIPad=/iPad/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+    const isIOS=/iP(hone|ad|od)/.test(ua)||isIPad;
     const isAndroid=/Android/.test(ua);
+    // iOS 第三者ブラウザ（Chrome=CriOS / Firefox=FxiOS / Edge=EdgiOS）は
+    // Safari とは共有の出し方が違うので文言を分ける。
+    const isIOSChrome=isIOS&&/(CriOS|FxiOS|EdgiOS)/.test(ua);
     const pick=isIOS?"tutHomeIOS":(isAndroid?"tutHomeAnd":"tutHomeGen");
-    const el=document.getElementById(pick);if(el)el.style.display="";
+    const el=document.getElementById(pick);
+    if(el){
+      if(isIOS){
+        const shareIco=`<svg class="tico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M8 7l4-4 4 4M6 12v7a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-7"/></svg>`;
+        const where=isIOSChrome?"Chromeの共有ボタン":(isIPad?"Safari右上の共有ボタン":"Safari下部の共有ボタン");
+        el.innerHTML=`${where} ${shareIco} を押して、<b class="nb">「ホーム画面に追加」</b>を選ぶと、アプリのように開けます。`;
+      }
+      el.style.display="";
+    }
     const scr=document.getElementById("tutScrim");
     let done=false;
     const close=()=>{if(done)return;done=true;scr.classList.remove("on");};
