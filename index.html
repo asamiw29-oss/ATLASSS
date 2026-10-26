@@ -395,15 +395,15 @@
     <div class="fld"><label>ジャンル / CATEGORIES（複数選択可）</label><div id="fCatMulti" class="multiCat"></div></div>
     <div class="fld chkFld"><label class="cb"><input type="checkbox" id="fDelivery"> 🛵 フードデリバリー対応（Uber Eats / Grab / Wolt 等）</label></div>
     <div class="fld"><label>メモ / MEMO</label><textarea id="fMemo" placeholder="🇯🇵24時まで営業、クレジットカードNG、一人でも入りやすい、おすすめは味噌ラーメン など"></textarea></div>
-    <button class="detailsTog" id="togDetails" type="button"><span class="caret">▸</span> 詳細（役職・登録者名）</button>
-    <div class="detailsBox" id="detailsBox">
-      <div class="fld"><label>役職 / ROLE</label>
-        <div class="roleGrp" id="fRole">
-          <button type="button" data-role="pilot" class="rBtn"><span class="rSvg"></span><span class="rLbl">Pilot</span></button>
-          <button type="button" data-role="ca" class="rBtn"><span class="rSvg"></span><span class="rLbl">CA</span></button>
-          <button type="button" data-role="" class="rBtn"><span class="rSvg wide"></span><span class="rLbl">指定なし</span></button>
-        </div>
+    <div class="fld"><label>役職 / ROLE</label>
+      <div class="roleGrp" id="fRole">
+        <button type="button" data-role="pilot" class="rBtn"><span class="rSvg"></span><span class="rLbl">Pilot</span></button>
+        <button type="button" data-role="ca" class="rBtn"><span class="rSvg"></span><span class="rLbl">CA</span></button>
+        <button type="button" data-role="" class="rBtn"><span class="rSvg wide"></span><span class="rLbl">指定なし</span></button>
       </div>
+    </div>
+    <button class="detailsTog" id="togDetails" type="button"><span class="caret">▸</span> 詳細（登録者名）</button>
+    <div class="detailsBox" id="detailsBox">
       <div class="fld"><label>登録者名 / BY</label><input type="text" id="fReg" placeholder="ニックネーム"></div>
     </div>
   </div>
@@ -1228,7 +1228,7 @@
     document.getElementById("fDelivery").checked=!!form.delivery;
     document.getElementById("fSearch").value="";document.getElementById("geoms").innerHTML="";
     refreshCatUI();refreshRoleUI();
-    const hasDetails=!!(s.registrant||form.role);
+    const hasDetails=!!s.registrant;
     document.getElementById("togDetails").classList.toggle("open",hasDetails);
     document.getElementById("detailsBox").classList.toggle("open",hasDetails);
     locStatus();validate();if(form.lat!=null)showTemp(form.lat,form.lng);
@@ -1469,7 +1469,9 @@
   function saveLastReg(v){try{if(v)localStorage.setItem(LAST_REG_KEY,v);}catch(e){}}
   function getLastAir(){try{return normReg(localStorage.getItem(LAST_AIR_KEY)||"")||DEFAULT_AIR;}catch(e){return DEFAULT_AIR;}}
   function saveLastAir(v){try{if(normReg(v))localStorage.setItem(LAST_AIR_KEY,normReg(v));}catch(e){}}
-  function getLastRole(){try{return normRole(localStorage.getItem(LAST_ROLE_KEY)||"");}catch(e){return"";}}
+  // Default role is CA (most users are cabin crew); once someone picks Pilot it
+  // is remembered for their next add.
+  function getLastRole(){try{const v=normRole(localStorage.getItem(LAST_ROLE_KEY)||"");return v||"ca";}catch(e){return"ca";}}
   function saveLastRole(v){try{if(v)localStorage.setItem(LAST_ROLE_KEY,v);}catch(e){}}
 
   async function pasteFromClip(){
