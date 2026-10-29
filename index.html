@@ -142,6 +142,7 @@
   .item .mk{flex:0 0 auto;width:9px;height:9px;border-radius:2px;margin-top:6px}
   .item .body{min-width:0;flex:1}
   .item .name{font-family:var(--serif);font-weight:500;font-size:15px;line-height:1.3}
+  .newBadge{display:inline-block;vertical-align:middle;margin-left:6px;font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.06em;line-height:1;padding:3px 5px;border-radius:3px;color:#fff;background:var(--brass);text-transform:lowercase}
   .item .sub{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-2);margin:1px 0 3px}
   .item .sub .dot{color:var(--line-2);margin:0 5px}.item .sub .code{color:var(--brass-d)}
   .item .note{font-size:12.5px;color:var(--ink-2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -481,6 +482,9 @@
   let touched=(function(){try{return JSON.parse(localStorage.getItem(TOUCH_KEY))||{};}catch(e){return{};}})();
   function touch(id){try{touched[id]=new Date().toISOString();localStorage.setItem(TOUCH_KEY,JSON.stringify(touched));}catch(e){}}
   function activityOf(s){const t=touched[s.id]||"",c=s.created_at||"";return t>c?t:c;}
+  // "new!" badge: stores created within the last 3 days (72h).
+  const NEW_MS=3*24*60*60*1000;
+  function isNew(s){if(!s||!s.created_at)return false;const t=Date.parse(s.created_at);return !isNaN(t)&&(Date.now()-t)<NEW_MS;}
   // Airport shown before a location is picked; detectRegion overwrites it once one is.
   const DEFAULT_AIR="LAX";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
@@ -873,7 +877,7 @@
     const delHtml=s.delivery?`<span class="delBadge" title="デリバリー対応">🛵 デリバリー可</span>`:"";
     const gmapText=encodeURIComponent(s.name+" "+a.city);
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
-    return `<div class="pop" data-id="${esc(s.id)}"><h3>${esc(s.name)}</h3>
+    return `<div class="pop" data-id="${esc(s.id)}"><h3>${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}</h3>
       <div class="meta">${catBadges}</div>
       <div class="meta2">${esc(a.city)} <span class="code">${esc(a.code)}</span>${delHtml?" · "+delHtml:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}
@@ -1003,7 +1007,7 @@
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
     const gmapUrl=`https://www.google.com/maps/search/?api=1&query=${gmapText}${pidParam?`&query_place_id=${pidParam}`:""}`;
     it.innerHTML=`<span class="mk" style="background:${c.color}"></span><div class="body">
-      <div class="name">${esc(s.name)}${roleHtml}${delHtml}</div>
+      <div class="name">${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
       <a class="itgm" href="${gmapUrl}" target="_blank" rel="noopener" aria-label="Google Mapで開く"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5c3.8-4.3 6-7.6 6-11a6 6 0 1 0-12 0c0 3.4 2.2 6.7 6 11z"/><circle cx="12" cy="10.3" r="2.1"/></svg></a>`;
@@ -1742,14 +1746,11 @@
     document.getElementById("fDelivery").addEventListener("change",e=>form.delivery=e.target.checked);
     document.getElementById("locSearch").onclick=()=>{const q=document.getElementById("fSearch").value.trim();if(q)geocode(q);};
     document.getElementById("fSearch").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const q=e.target.value.trim();if(q)geocode(q);}});
-    // Offline support removed: the service worker was causing stale-cache issues
-    // (app needing a full restart to work). Actively tear down any SW + its caches
-    // so the app always loads fresh from the network.
+    // Offline support (sw.js). HTML is served network-first, so the app always
+    // updates when online and only falls back to cache when offline — this avoids
+    // the old stale-cache trap that needed a full restart.
     if("serviceWorker" in navigator){
-      navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
-    }
-    if(window.caches&&caches.keys){
-      caches.keys().then(ks=>ks.forEach(k=>{if(k.indexOf("atlas-")===0)caches.delete(k);})).catch(()=>{});
+      window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{});});
     }
     function showOnline(){
       updateSync();
