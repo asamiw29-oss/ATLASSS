@@ -14,7 +14,7 @@
 
    Bump VERSION to force a clean rollover; activate() deletes all older caches. */
 
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL = "atlas-shell-" + VERSION;   // app shell + core CDN libs
 const TILES = "atlas-tiles-" + VERSION;   // map tiles (capped)
 const TILE_LIMIT = 300;                   // max tiles kept offline
@@ -73,6 +73,9 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET") return;               // writes always hit the network
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
+
+  // Vercel Analytics: never intercept or cache — straight to the network.
+  if (url.origin === self.location.origin && url.pathname.startsWith("/_vercel/")) return;
 
   // Live data: never intercept — straight to the network.
   if (isData(url)) return;
