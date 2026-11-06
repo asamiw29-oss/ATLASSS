@@ -143,6 +143,8 @@
   .item .body{min-width:0;flex:1}
   .item .name{font-family:var(--serif);font-weight:500;font-size:15px;line-height:1.3}
   .newBadge{display:inline-block;vertical-align:middle;margin-left:6px;font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.06em;line-height:1;padding:3px 5px;border-radius:3px;color:#fff;background:var(--brass);text-transform:lowercase}
+  .michBadge{display:inline-block;vertical-align:middle;margin-left:6px;font-size:9px;font-weight:700;letter-spacing:.04em;line-height:1;padding:3px 5px;border-radius:3px;color:#fff;background:#c8102e}
+  .michBadge.former{background:#9a958c}
   .item .sub{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-2);margin:1px 0 3px}
   .item .sub .dot{color:var(--line-2);margin:0 5px}.item .sub .code{color:var(--brass-d)}
   .item .note{font-size:12.5px;color:var(--ink-2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -352,6 +354,7 @@
     <div class="fgroup"><div class="flabel">エリア / MACRO</div><div class="chips" id="macroChips"></div></div>
     <div class="fgroup"><div class="flabel">空港 / AIRPORT</div><div class="chips" id="airportChips"></div></div>
     <div class="fgroup"><div class="flabel">料理 / CATEGORY</div><div class="chips" id="catChips"></div></div>
+    <div class="fgroup"><div class="flabel">特集 / FEATURE</div><div class="chips" id="featChips"></div></div>
   </div>
 </div>
 
@@ -485,6 +488,25 @@
   // "new!" badge: stores created within the last 3 days (72h).
   const NEW_MS=3*24*60*60*1000;
   function isNew(s){if(!s||!s.created_at)return false;const t=Date.parse(s.created_at);return !isNaN(t)&&(Date.now()-t)<NEW_MS;}
+  // Michelin Guide distinctions, keyed by Google place_id (cross-checked 2026-11-06).
+  // t: star = starred, bib = Bib Gourmand, sel = guide-listed (Selected/Plate),
+  // former = held a distinction in the past (shown muted, still counts for the filter).
+  const MICHELIN={
+    "ChIJnWdQKQQZ2jERxH3g-HsHchE":{t:"star",label:"★ ミシュラン 1つ星"},
+    "ChIJr1El-0uZ4jARLYqkWs-lKBw":{t:"bib",label:"ビブグルマン"},
+    "ChIJ-bdNrsWY4jARg21vixZMkKc":{t:"bib",label:"ビブグルマン"},
+    "ChIJvc25_B-Z4jARBm61t0scwhI":{t:"bib",label:"ビブグルマン"},
+    "ChIJ2Tc3MA0Z2jERXkN6MsVZXZc":{t:"bib",label:"ビブグルマン"},
+    "ChIJnTLdlLcZ2jER7RBSwuK6zqU":{t:"bib",label:"ビブグルマン"},
+    "ChIJQR1ODmCjfDUREpgR7iCRQDI":{t:"bib",label:"ビブグルマン"},
+    "ChIJ9Uxbo4qjfDURYaXnzVaYiMY":{t:"bib",label:"ビブグルマン"},
+    "ChIJg3SVybo3zDERADqEe4aL-VA":{t:"bib",label:"ビブグルマン"},
+    "ChIJAenlH3MZ2jERyoosIJnXBeE":{t:"sel",label:"ミシュラン掲載"},
+    "ChIJKyRwBs-Y4jARYGe3Dw40LoI":{t:"former",label:"元ビブグルマン"},
+    "ChIJx15N6feifDURmUuQT_G1CAc":{t:"former",label:"元ビブグルマン"}
+  };
+  function michelinOf(s){return (s&&s.place_id&&MICHELIN[s.place_id])||null;}
+  function michBadge(s){const m=michelinOf(s);return m?`<span class="michBadge${m.t==="former"?" former":""}">${esc(m.label)}</span>`:"";}
   // Airport shown before a location is picked; detectRegion overwrites it once one is.
   const DEFAULT_AIR="LAX";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
@@ -797,7 +819,7 @@
   }
 
   let stores=loadCache();
-  let fMacro="ALL",fAirport="ALL",fCat="ALL",q="",filtersOpen=false;
+  let fMacro="ALL",fAirport="ALL",fCat="ALL",fMich=false,q="",filtersOpen=false;
   let map,layer,markers=[],temp=null,editing=null,zoomLabels=false;
   let form=blank();
   function blank(){return{region:getLastAir(),cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:""};}
@@ -877,7 +899,7 @@
     const delHtml=s.delivery?`<span class="delBadge" title="デリバリー対応">🛵 デリバリー可</span>`:"";
     const gmapText=encodeURIComponent(s.name+" "+a.city);
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
-    return `<div class="pop" data-id="${esc(s.id)}"><h3>${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}</h3>
+    return `<div class="pop" data-id="${esc(s.id)}"><h3>${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${michBadge(s)}</h3>
       <div class="meta">${catBadges}</div>
       <div class="meta2">${esc(a.city)} <span class="code">${esc(a.code)}</span>${delHtml?" · "+delHtml:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}
@@ -901,6 +923,7 @@
     if(fMacro!=="ALL"&&airOf(s.region).macro!==fMacro)return false;
     if(fAirport!=="ALL"&&s.region!==fAirport)return false;
     if(fCat!=="ALL"&&!(s.categories||[]).includes(fCat))return false;
+    if(fMich&&!michelinOf(s))return false;
     if(!matchesQ(s))return false;
     return true;
   });}
@@ -945,11 +968,16 @@
     cw.appendChild(chip("すべて",null,scopeTotal,fCat==="ALL",null,()=>{fCat="ALL";render();}));
     CATS.forEach(c=>{const n=countCat(c.id);if(n===0&&fCat!==c.id)return;
       cw.appendChild(chip(c.label,null,n,fCat===c.id,c.color,()=>{fCat=(fCat===c.id?"ALL":c.id);render();},false));});
+    // FEATURE row — Michelin filter
+    const fw=document.getElementById("featChips");fw.innerHTML="";
+    const michN=stores.filter(s=>michelinOf(s)).length;
+    fw.appendChild(chip("ミシュラン掲載のみ",null,michN,fMich,null,()=>{fMich=!fMich;render();}));
     // Sheet head
     const parts=[];
     if(fAirport!=="ALL")parts.push(fAirport+" "+airOf(fAirport).city);
     else if(fMacro!=="ALL")parts.push(macroOf(fMacro).label);
     if(fCat!=="ALL")parts.push(catOf(fCat).label);
+    if(fMich)parts.push("ミシュラン掲載");
     document.getElementById("sheetTitle").textContent=parts.length?parts.join(" · "):"すべての一覧";
   }
   function chip(label,code,n,active,color,onclick,zero){
@@ -1007,7 +1035,7 @@
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
     const gmapUrl=`https://www.google.com/maps/search/?api=1&query=${gmapText}${pidParam?`&query_place_id=${pidParam}`:""}`;
     it.innerHTML=`<span class="mk" style="background:${c.color}"></span><div class="body">
-      <div class="name">${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${roleHtml}${delHtml}</div>
+      <div class="name">${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${michBadge(s)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
       <a class="itgm" href="${gmapUrl}" target="_blank" rel="noopener" aria-label="Google Mapで開く"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5c3.8-4.3 6-7.6 6-11a6 6 0 1 0-12 0c0 3.4 2.2 6.7 6 11z"/><circle cx="12" cy="10.3" r="2.1"/></svg></a>`;

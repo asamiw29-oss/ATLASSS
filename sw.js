@@ -14,7 +14,7 @@
 
    Bump VERSION to force a clean rollover; activate() deletes all older caches. */
 
-const VERSION = "v3";
+const VERSION = "v4";
 const SHELL = "atlas-shell-" + VERSION;   // app shell + core CDN libs
 const TILES = "atlas-tiles-" + VERSION;   // map tiles (capped)
 const TILE_LIMIT = 300;                   // max tiles kept offline
