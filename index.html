@@ -1040,7 +1040,7 @@
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
     const gmapUrl=`https://www.google.com/maps/search/?api=1&query=${gmapText}${pidParam?`&query_place_id=${pidParam}`:""}`;
     const thumb=photoUrl(s);
-    it.innerHTML=`${thumb?`<img class="thumb" src="${thumb}" alt="" loading="lazy" onerror="this.remove()">`:`<span class="mk" style="background:${c.color}"></span>`}<div class="body">
+    it.innerHTML=`<span class="mk" style="background:${c.color}"></span>${thumb?`<img class="thumb" src="${thumb}" alt="" loading="lazy" onerror="this.remove()">`:""}<div class="body">
       <div class="name">${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${michBadge(s)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
