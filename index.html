@@ -120,6 +120,30 @@
   .pop .row button{font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:5px 9px;border:1px solid var(--line-2);border-radius:3px}
   .pop .row .del{color:#a8493f;border-color:#e2c4bf}
 
+  /* ===== Store detail sheet (pilot) ===== */
+  .dScrim{position:fixed;inset:0;background:rgba(20,31,43,.5);z-index:1100;display:none}.dScrim.on{display:block}
+  .dSheet{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:540px;background:var(--paper);z-index:1101;border-radius:20px 20px 0 0;max-height:88dvh;overflow-y:auto;display:none;box-shadow:0 -8px 40px rgba(20,31,43,.3);padding:10px 18px calc(18px + var(--safeb))}
+  .dSheet.on{display:block}
+  .dGrab{width:44px;height:5px;border-radius:3px;background:#d8d4cc;margin:2px auto 12px}
+  .dClose{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.94);color:var(--ink-2);font-size:14px;box-shadow:0 1px 6px rgba(20,31,43,.2);z-index:2;border:none}
+  .dPhotoWrap{position:relative;border-radius:16px;overflow:hidden}
+  .dPhoto{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+  .dPhotoWrap .cdot{position:absolute;right:10px;bottom:10px;width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+  .dNameRow{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:16px}
+  .dName{font-family:var(--serif);font-weight:600;font-size:24px;color:var(--ink);line-height:1.25}
+  .dChips{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .dChip{font-size:12px;padding:4px 11px;border-radius:20px;border:1.5px solid;background:var(--paper-2)}
+  .dCity{font-size:13px;color:var(--ink-2)}
+  .dDiv{border-top:1px solid var(--line);margin:16px 0 12px}
+  .dMemoLabel{font-size:11px;letter-spacing:.1em;color:var(--ink-3);margin-bottom:6px}
+  .dMemo{font-size:14.5px;line-height:1.65;color:var(--ink);white-space:pre-wrap}
+  .dMeta{font-size:12.5px;color:var(--ink-2);margin-top:14px}
+  .dBtns{display:flex;gap:10px;margin-top:16px}
+  .dBtns a,.dBtns button{flex:1;text-align:center;padding:13px 0;border-radius:12px;font-size:14px;text-decoration:none}
+  .dBtns a{border:1.5px solid var(--line-2);color:var(--ink);background:var(--paper)}
+  .dBtns button{background:var(--navy);color:#fff;border:none;cursor:pointer}
+  .dDel{display:block;margin:14px auto 2px;font-size:12px;color:#a8493f;background:none;border:none;cursor:pointer}
+
   .fab{position:absolute;right:16px;bottom:16px;z-index:600;background:var(--brass);color:#fff;font-family:var(--mono);font-weight:500;letter-spacing:.06em;font-size:12px;border-radius:30px;padding:12px 17px;box-shadow:0 5px 16px rgba(169,139,93,.5);display:none;align-items:center;gap:6px}
 
   .sheet{flex:0 0 var(--sheet);padding-bottom:var(--safeb);background:var(--paper);border-top:1px solid var(--line);display:flex;flex-direction:column;min-height:0;box-shadow:0 -4px 16px rgba(20,31,43,.06);transition:flex .25s ease}
@@ -382,6 +406,20 @@
 </nav>
 
 <div class="scrim" id="scrim"></div>
+<div class="dScrim" id="dScrim"></div>
+<div class="dSheet" id="dSheet">
+  <div class="dGrab"></div>
+  <button class="dClose" id="dClose" type="button">✕</button>
+  <div class="dPhotoWrap" id="dPhotoWrap"><img class="dPhoto" id="dPhoto" alt=""><span class="cdot" id="dCdot"></span></div>
+  <div class="dNameRow"><span class="dName" id="dName"></span><span id="dBadges"></span></div>
+  <div class="dChips" id="dChips"></div>
+  <div class="dDiv"></div>
+  <div class="dMemoLabel">メモ</div>
+  <div class="dMemo" id="dMemo"></div>
+  <div class="dMeta" id="dMeta"></div>
+  <div class="dBtns"><a id="dDir" target="_blank" rel="noopener">▷ 経路</a><a id="dGm" target="_blank" rel="noopener">◉ GMap</a><button id="dEdit" type="button">編集</button></div>
+  <button class="dDel" id="dDel" type="button">このお店を削除</button>
+</div>
 <div class="modal" id="modal">
   <div class="m-head"><span class="grip"></span><h2 id="mTitle">お店を追加</h2><button class="close" id="mClose">✕</button></div>
   <div class="m-body">
@@ -510,6 +548,32 @@
   };
   function michelinOf(s){return (s&&s.place_id&&MICHELIN[s.place_id])||null;}
   function michBadge(s){const m=michelinOf(s);return m?`<span class="michBadge${m.t==="former"?" former":""}">${esc(m.label)}</span>`:"";}
+
+  // ===== Store detail sheet (pilot: one store only) =====
+  const DETAIL_PILOT="mrsg1tz4-438"; // ティップサマイ
+  let detailId=null;
+  function openDetail(id){
+    const s=stores.find(x=>x.id===id);if(!s)return;detailId=id;
+    const pw=$("dPhotoWrap");
+    if(s.photo){pw.style.display="";$("dPhoto").src=photoUrl(s,800);$("dCdot").style.background=catColor(mainCat(s));}
+    else pw.style.display="none";
+    $("dName").textContent=s.name;
+    $("dBadges").innerHTML=michBadge(s)+(isNew(s)?' <span class="newBadge">new!</span>':"");
+    $("dChips").innerHTML=catList(s).map(c=>`<span class="dChip" style="border-color:${catColor(c)};color:${catColor(c)}">${esc(c)}</span>`).join("")
+      +`<span class="dCity">${esc(cityJa(s.region))} ${esc(s.region)}</span>`;
+    $("dMemo").textContent=s.memo||"";
+    const reg=s.registrant||(s.role==="ca"?"CA":s.role==="pilot"?"Pilot":"");
+    $("dMeta").textContent=(reg?("登録："+reg):"")+(s.delivery?"　·　デリバリー可 🚴":"");
+    const gt=encodeURIComponent(s.name+" "+(s.address||""));
+    $("dDir").href="https://www.google.com/maps/dir/?api=1&destination="+gt+(s.place_id?("&destination_place_id="+s.place_id):"");
+    $("dGm").href="https://www.google.com/maps/search/?api=1&query="+gt+(s.place_id?("&query_place_id="+s.place_id):"");
+    $("dScrim").classList.add("on");$("dSheet").classList.add("on");$("dSheet").scrollTop=0;
+  }
+  function closeDetail(){$("dScrim").classList.remove("on");$("dSheet").classList.remove("on");detailId=null;}
+  $("dClose").onclick=closeDetail;
+  $("dScrim").onclick=closeDetail;
+  $("dEdit").onclick=()=>{const id=detailId;closeDetail();if(id)openEdit(id);};
+  $("dDel").onclick=()=>{const id=detailId;closeDetail();if(id)delSpot(id);};
   // Store photo: the sheet keeps the Places photo resource name; the media URL
   // is built at render time so the API key itself is never stored in the sheet.
   function photoUrl(s,w){if(!s||!s.photo||!EMBED_CFG.gkey)return "";
@@ -1056,7 +1120,7 @@
     if(timg){if(thumbIO)thumbIO.observe(timg);else if(timg.dataset.src)timg.src=timg.dataset.src;}
     // In list view the map is hidden, so the map popup (with its edit button) is
     // unreachable — open the edit form directly instead of flying the hidden map.
-    it.onclick=()=>{if(document.querySelector(".work").classList.contains("listview"))openEdit(s.id);else flyTo(s);};
+    it.onclick=()=>{if(s.id===DETAIL_PILOT){openDetail(s.id);return;}if(document.querySelector(".work").classList.contains("listview"))openEdit(s.id);else flyTo(s);};
     // Tapping the GMap button must open Maps only, not the row's edit/fly action.
     const gm=it.querySelector(".itgm");if(gm)gm.onclick=e=>e.stopPropagation();
     return it;
