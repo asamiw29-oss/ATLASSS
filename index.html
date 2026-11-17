@@ -140,7 +140,9 @@
   .item{display:flex;gap:11px;padding:11px 15px;border-bottom:1px solid var(--paper-2);cursor:pointer;transition:background .12s}
   .item:hover{background:var(--paper-2)}
   .item .mk{flex:0 0 auto;width:9px;height:9px;border-radius:2px;margin-top:6px}
-  .item .thumb{flex:0 0 auto;width:54px;height:54px;border-radius:10px;object-fit:cover;background:var(--paper-2)}
+  .item .thumbWrap{position:relative;flex:0 0 auto;width:54px;height:54px}
+  .item .thumb{width:100%;height:100%;display:block;border-radius:10px;object-fit:cover;background:var(--paper-2)}
+  .item .thumbWrap .cdot{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border-radius:50%;border:2.5px solid var(--paper)}
   .item .body{min-width:0;flex:1}
   .item .name{font-family:var(--serif);font-weight:500;font-size:15px;line-height:1.3}
   .newBadge{display:inline-block;vertical-align:middle;margin-left:6px;font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.06em;line-height:1;padding:3px 5px;border-radius:3px;color:#fff;background:var(--brass);text-transform:lowercase}
@@ -1040,7 +1042,7 @@
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
     const gmapUrl=`https://www.google.com/maps/search/?api=1&query=${gmapText}${pidParam?`&query_place_id=${pidParam}`:""}`;
     const thumb=photoUrl(s);
-    it.innerHTML=`<span class="mk" style="background:${c.color}"></span>${thumb?`<img class="thumb" src="${thumb}" alt="" loading="lazy" onerror="this.remove()">`:""}<div class="body">
+    it.innerHTML=`${thumb?`<span class="thumbWrap"><img class="thumb" src="${thumb}" alt="" loading="lazy" onerror="this.parentNode.remove()"><span class="cdot" style="background:${c.color}"></span></span>`:`<span class="mk" style="background:${c.color}"></span>`}<div class="body">
       <div class="name">${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${michBadge(s)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
