@@ -14,10 +14,12 @@
 
    Bump VERSION to force a clean rollover; activate() deletes all older caches. */
 
-const VERSION = "v9";
+const VERSION = "v10";
 const SHELL = "atlas-shell-" + VERSION;   // app shell + core CDN libs
 const TILES = "atlas-tiles-" + VERSION;   // map tiles (capped)
 const TILE_LIMIT = 300;                   // max tiles kept offline
+const PHOTOS = "atlas-photos-" + VERSION; // store thumbnails (runtime cache)
+const PHOTO_LIMIT = 400;                  // max thumbnails kept
 
 const CORE = ["./", "./index.html", "./manifest.json"];
 const CDN = [
@@ -42,13 +44,16 @@ self.addEventListener("activate", e => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys
-      .filter(k => k.startsWith("atlas-") && k !== SHELL && k !== TILES)
+      .filter(k => k.startsWith("atlas-") && k !== SHELL && k !== TILES && k !== PHOTOS)
       .map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
 
 const isTile = u => u.hostname.endsWith("stadiamaps.com");
+// Places photo media: immutable per photo name, so cache-first like tiles.
+// (The blanket googleapis.com rule below would otherwise never cache them.)
+const isPhoto = u => u.hostname === "places.googleapis.com" && u.pathname.includes("/media");
 // Live data that must never be served stale.
 const isData = u =>
   u.hostname === "docs.google.com" ||
@@ -76,6 +81,26 @@ self.addEventListener("fetch", e => {
 
   // Vercel Analytics: never intercept or cache — straight to the network.
   if (url.origin === self.location.origin && url.pathname.startsWith("/_vercel/")) return;
+
+  // Store photos: cache-first with a capped runtime cache.
+  if (isPhoto(url)) {
+    e.respondWith((async () => {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+      try {
+        const net = await fetch(req);
+        if (net && (net.ok || net.type === "opaque")) {
+          const cache = await caches.open(PHOTOS);
+          await cache.put(req, net.clone());
+          trimCache(PHOTOS, PHOTO_LIMIT);
+        }
+        return net;
+      } catch (_) {
+        return cached || Response.error();
+      }
+    })());
+    return;
+  }
 
   // Live data: never intercept — straight to the network.
   if (isData(url)) return;
