@@ -140,6 +140,7 @@
   .item{display:flex;gap:11px;padding:11px 15px;border-bottom:1px solid var(--paper-2);cursor:pointer;transition:background .12s}
   .item:hover{background:var(--paper-2)}
   .item .mk{flex:0 0 auto;width:9px;height:9px;border-radius:2px;margin-top:6px}
+  .item .thumb{flex:0 0 auto;width:54px;height:54px;border-radius:10px;object-fit:cover;background:var(--paper-2)}
   .item .body{min-width:0;flex:1}
   .item .name{font-family:var(--serif);font-weight:500;font-size:15px;line-height:1.3}
   .newBadge{display:inline-block;vertical-align:middle;margin-left:6px;font-family:var(--mono);font-size:8.5px;font-weight:600;letter-spacing:.06em;line-height:1;padding:3px 5px;border-radius:3px;color:#fff;background:var(--brass);text-transform:lowercase}
@@ -436,7 +437,7 @@
       <div class="inner">
         <ol class="steps">
           <li>Google スプレッドシートを新規作成。シート名を <code>stores</code> にし、1行目に下のヘッダーを貼る。
-            <div class="hrow" id="hdrRow">id,name,category,region,lat,lng,memo,address,registrant,role,delivery,created_at,place_id</div>
+            <div class="hrow" id="hdrRow">id,name,category,region,lat,lng,memo,address,registrant,role,delivery,created_at,place_id,photo</div>
           </li>
           <li>共有 → 「リンクを知る全員」→ <b>閲覧者</b>。URLの <code>/d/</code> と <code>/edit</code> の間がシートID。</li>
           <li>拡張機能 → Apps Script。下のコードを貼って保存。
@@ -507,6 +508,10 @@
   };
   function michelinOf(s){return (s&&s.place_id&&MICHELIN[s.place_id])||null;}
   function michBadge(s){const m=michelinOf(s);return m?`<span class="michBadge${m.t==="former"?" former":""}">${esc(m.label)}</span>`:"";}
+  // Store photo: the sheet keeps the Places photo resource name; the media URL
+  // is built at render time so the API key itself is never stored in the sheet.
+  function photoUrl(s,w){if(!s||!s.photo||!EMBED_CFG.gkey)return "";
+    return "https://places.googleapis.com/v1/"+s.photo+"/media?maxWidthPx="+(w||200)+"&key="+EMBED_CFG.gkey;}
   // Airport shown before a location is picked; detectRegion overwrites it once one is.
   const DEFAULT_AIR="LAX";
   const IS_ADMIN=/[?&]admin=1\b/.test(location.search);
@@ -822,7 +827,7 @@
   let fMacro="ALL",fAirport="ALL",fCat="ALL",fMich=false,q="",filtersOpen=false;
   let map,layer,markers=[],temp=null,editing=null,zoomLabels=false;
   let form=blank();
-  function blank(){return{region:getLastAir(),cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:""};}
+  function blank(){return{region:getLastAir(),cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:"",photoName:""};}
 
   function getCfg(){if(HAS_EMBED)return{sheet:EMBED_CFG.sheet,apps:EMBED_CFG.apps};try{return JSON.parse(localStorage.getItem(CFG_KEY))||{};}catch(e){return{};}}
   function setCfg(c){try{localStorage.setItem(CFG_KEY,JSON.stringify(c));}catch(e){}}
@@ -1034,7 +1039,8 @@
     const gmapText=encodeURIComponent(s.name+" "+a.city);
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
     const gmapUrl=`https://www.google.com/maps/search/?api=1&query=${gmapText}${pidParam?`&query_place_id=${pidParam}`:""}`;
-    it.innerHTML=`<span class="mk" style="background:${c.color}"></span><div class="body">
+    const thumb=photoUrl(s);
+    it.innerHTML=`${thumb?`<img class="thumb" src="${thumb}" alt="" loading="lazy" onerror="this.remove()">`:`<span class="mk" style="background:${c.color}"></span>`}<div class="body">
       <div class="name">${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${michBadge(s)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
@@ -1106,7 +1112,7 @@
         server.push({id:g(row,"id")||uid(),name,categories:cats,region,lat,lng,
           memo:g(row,"memo"),address:g(row,"address"),
           registrant:g(row,"registrant"),role:normRole(g(row,"role")),delivery:normBool(g(row,"delivery")),
-          created_at:g(row,"created_at"),place_id:g(row,"place_id")});}
+          created_at:g(row,"created_at"),place_id:g(row,"place_id"),photo:g(row,"photo")});}
       const sids=new Set(server.map(s=>s.id));
       // Pending local changes must survive a sync, or an offline edit would silently
       // revert to the server copy the moment we reconnect.
@@ -1249,7 +1255,7 @@
     document.getElementById("mTitle").textContent="お店を追加";document.getElementById("mDelete").style.display="none";
     newSession();fill({name:"",memo:"",registrant:getLastReg(),url:""});openM();}
   function openEdit(id){const s=stores.find(x=>x.id===id);if(!s)return;editing=id;
-    form={region:s.region,cats:(s.categories&&s.categories.length?s.categories.slice():["other"]),lat:s.lat,lng:s.lng,delivery:!!s.delivery,role:normRole(s.role),placeId:s.place_id||""};
+    form={region:s.region,cats:(s.categories&&s.categories.length?s.categories.slice():["other"]),lat:s.lat,lng:s.lng,delivery:!!s.delivery,role:normRole(s.role),placeId:s.place_id||"",photoName:s.photo||""};
     document.getElementById("mTitle").textContent="お店を編集";document.getElementById("mDelete").style.display="";
     newSession();fill({name:s.name,memo:s.memo,registrant:s.registrant,url:s.url});openM();}
   function fill(s){
@@ -1327,12 +1333,13 @@
       const r=await fetch("https://places.googleapis.com/v1/places:searchText",{
         method:"POST",signal:ac?ac.signal:undefined,
         headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,
-          "X-Goog-FieldMask":"places.location,places.displayName,places.id"},
+          "X-Goog-FieldMask":"places.location,places.displayName,places.id,places.photos"},
         body:JSON.stringify({textQuery:q,languageCode:"ja"})});
       const d=await r.json();
       if(d.places&&d.places.length){const p=d.places[0];
         return{lat:p.location.latitude,lng:p.location.longitude,
-          name:(p.displayName&&p.displayName.text)||null,placeId:p.id||null};}
+          name:(p.displayName&&p.displayName.text)||null,placeId:p.id||null,
+          photoName:(p.photos&&p.photos[0]&&p.photos[0].name)||""};}
     }catch(e){}finally{clearTimeout(timer);}
     return null;
   }
@@ -1378,6 +1385,7 @@
     if(res.lat==null){toast("座標が見つかりません（@lat,lng を含むURLを）");return;}
     setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
     if(res.placeId)form.placeId=res.placeId;
+    if(res.photoName!==undefined)form.photoName=res.photoName||"";
     const n=document.getElementById("fName");if(res.name&&!n.value.trim())n.value=res.name;validate();inp.value="";}
 
   // ---- Google Places (New) autocomplete ----
@@ -1472,7 +1480,7 @@
     try{
       const url="https://places.googleapis.com/v1/places/"+encodeURIComponent(it.placeId)+"?sessionToken="+encodeURIComponent(acSession||"");
       const r=await fetch(url,{
-        headers:{"X-Goog-Api-Key":key,"X-Goog-FieldMask":"id,displayName,location,formattedAddress,primaryType,types"}
+        headers:{"X-Goog-Api-Key":key,"X-Goog-FieldMask":"id,displayName,location,formattedAddress,primaryType,types,photos"}
       });
       const d=await r.json();
       if(d.location){
@@ -1482,6 +1490,7 @@
         if(gc&&!form.cats.includes(gc))form.cats=[gc];
         refreshCatUI();
         if(d.id)form.placeId=d.id;
+        form.photoName=(d.photos&&d.photos[0]&&d.photos[0].name)||"";
       }else{
         toast("場所の詳細を取得できませんでした");
       }
@@ -1579,7 +1588,7 @@
       memo:document.getElementById("fMemo").value.trim(),address:"",
       registrant,role:normRole(form.role),
       delivery:!!form.delivery,
-      created_at:new Date().toISOString(),place_id:form.placeId||""};
+      created_at:new Date().toISOString(),place_id:form.placeId||"",photo:form.photoName||""};
     const isEdit=!!editing;
     if(!isEdit){
       const dup=findDuplicate(rec);
@@ -1634,7 +1643,7 @@
         region:normReg(s.region)||detectRegion(s.lat,s.lng),
         lat:s.lat,lng:s.lng,memo:s.memo||s.note||"",address:s.address||"",
         registrant:s.registrant||"",role:normRole(s.role),delivery:normBool(s.delivery),
-        created_at:s.created_at||"",place_id:s.place_id||"",url:s.url||""});add++;}});
+        created_at:s.created_at||"",place_id:s.place_id||"",photo:s.photo||"",url:s.url||""});add++;}});
     saveCache();render();toast(add+" 軒を読み込みました（マージ）");}catch(e){toast("読み込めないファイルです");}};rd.readAsText(file);}
 
   function el(t,c){const e=document.createElement(t);if(c)e.className=c;return e;}
