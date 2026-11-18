@@ -550,6 +550,7 @@
   function michBadge(s){const m=michelinOf(s);return m?`<span class="michBadge${m.t==="former"?" former":""}">${esc(m.label)}</span>`:"";}
 
   // ===== Store detail sheet (pilot: one store only) =====
+  const $=id=>document.getElementById(id);
   const DETAIL_PILOT="mrsg1tz4-438"; // ティップサマイ
   let detailId=null;
   function openDetail(id){
