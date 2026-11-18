@@ -589,6 +589,47 @@
   $("dScrim").onclick=closeDetail;
   $("dEdit").onclick=()=>{const id=detailId;closeDetail();if(id)openEdit(id);};
   $("dDel").onclick=()=>{const id=detailId;closeDetail();if(id)delSpot(id);};
+  // Swipe down to dismiss. The drag only engages when the content is already
+  // scrolled to the top and the gesture moves downward, so normal scrolling
+  // of the memo is never hijacked.
+  (function(){
+    const sheet=$("dSheet"),scroller=$("dScroll");
+    let startY=null,dy=0,active=false;
+    const base=()=>window.innerWidth>=820?"translate(-50%,-50%)":"translateX(-50%)";
+    function start(y){startY=y;dy=0;active=(scroller.scrollTop<=0);}
+    function move(y,ev){
+      if(startY===null||!active)return;
+      dy=y-startY;
+      if(dy<=0){sheet.style.transform="";return;}
+      if(ev&&ev.cancelable)ev.preventDefault();
+      sheet.style.transition="none";
+      sheet.style.transform=base()+" translateY("+dy+"px)";
+    }
+    function end(){
+      if(startY===null)return;
+      const d=dy,was=active;startY=null;dy=0;active=false;
+      if(was&&d>100){
+        sheet.style.transition="transform .18s ease-in";
+        sheet.style.transform=base()+" translateY(105%)";
+        setTimeout(()=>{closeDetail();sheet.style.transition="";sheet.style.transform="";},170);
+      }else{
+        sheet.style.transition="transform .18s ease";
+        sheet.style.transform="";
+        setTimeout(()=>{sheet.style.transition="";},190);
+      }
+    }
+    sheet.addEventListener("touchstart",e=>{if(e.touches.length===1)start(e.touches[0].clientY);},{passive:true});
+    sheet.addEventListener("touchmove",e=>{move(e.touches[0].clientY,e);},{passive:false});
+    sheet.addEventListener("touchend",end);
+    sheet.addEventListener("touchcancel",end);
+    sheet.addEventListener("mousedown",e=>{
+      if(e.target.closest("a,button,input,textarea,select"))return;
+      start(e.clientY);
+      const mm=ev2=>move(ev2.clientY,null);
+      const mu=()=>{window.removeEventListener("mousemove",mm);window.removeEventListener("mouseup",mu);end();};
+      window.addEventListener("mousemove",mm);window.addEventListener("mouseup",mu);
+    });
+  })();
   // Store photo: the sheet keeps the Places photo resource name; the media URL
   // is built at render time so the API key itself is never stored in the sheet.
   function photoUrl(s,w){if(!s||!s.photo||!EMBED_CFG.gkey)return "";
