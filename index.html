@@ -120,7 +120,7 @@
   .pop .row button{font-family:var(--mono);font-size:10px;letter-spacing:.06em;padding:5px 9px;border:1px solid var(--line-2);border-radius:3px}
   .pop .row .del{color:#a8493f;border-color:#e2c4bf}
 
-  /* ===== Store detail sheet (pilot) ===== */
+  /* ===== Store detail sheet ===== */
   .dScrim{position:fixed;inset:0;background:rgba(20,31,43,.5);z-index:1100;display:none}.dScrim.on{display:block}
   .dSheet{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:100%;max-width:540px;background:var(--paper);z-index:1101;border-radius:20px 20px 0 0;max-height:88dvh;overflow-y:auto;display:none;box-shadow:0 -8px 40px rgba(20,31,43,.3);padding:10px 18px calc(18px + var(--safeb))}
   .dSheet.on{display:block}
@@ -549,9 +549,8 @@
   function michelinOf(s){return (s&&s.place_id&&MICHELIN[s.place_id])||null;}
   function michBadge(s){const m=michelinOf(s);return m?`<span class="michBadge${m.t==="former"?" former":""}">${esc(m.label)}</span>`:"";}
 
-  // ===== Store detail sheet (pilot: one store only) =====
+  // ===== Store detail sheet =====
   const $=id=>document.getElementById(id);
-  const DETAIL_PILOT="mrsg1tz4-438"; // ティップサマイ
   let detailId=null;
   function openDetail(id){
    try{
@@ -1123,7 +1122,7 @@
     if(timg){if(thumbIO)thumbIO.observe(timg);else if(timg.dataset.src)timg.src=timg.dataset.src;}
     // In list view the map is hidden, so the map popup (with its edit button) is
     // unreachable — open the edit form directly instead of flying the hidden map.
-    it.onclick=()=>{if(s.id===DETAIL_PILOT){openDetail(s.id);return;}if(document.querySelector(".work").classList.contains("listview"))openEdit(s.id);else flyTo(s);};
+    it.onclick=()=>{openDetail(s.id);};
     // Tapping the GMap button must open Maps only, not the row's edit/fly action.
     const gm=it.querySelector(".itgm");if(gm)gm.onclick=e=>e.stopPropagation();
     return it;
