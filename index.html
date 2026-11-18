@@ -554,6 +554,7 @@
   const DETAIL_PILOT="mrsg1tz4-438"; // ティップサマイ
   let detailId=null;
   function openDetail(id){
+   try{
     const s=stores.find(x=>x.id===id);if(!s)return;detailId=id;
     const pw=$("dPhotoWrap");
     if(s.photo){pw.style.display="";$("dPhoto").src=photoUrl(s,800);$("dCdot").style.background=catColor(mainCat(s));}
@@ -569,6 +570,7 @@
     $("dDir").href="https://www.google.com/maps/dir/?api=1&destination="+gt+(s.place_id?("&destination_place_id="+s.place_id):"");
     $("dGm").href="https://www.google.com/maps/search/?api=1&query="+gt+(s.place_id?("&query_place_id="+s.place_id):"");
     $("dScrim").classList.add("on");$("dSheet").classList.add("on");$("dSheet").scrollTop=0;
+   }catch(e){toast("詳細を開けませんでした: "+(e&&e.message?e.message:e));openEdit(id);}
   }
   function closeDetail(){$("dScrim").classList.remove("on");$("dSheet").classList.remove("on");detailId=null;}
   $("dClose").onclick=closeDetail;
