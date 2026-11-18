@@ -131,7 +131,7 @@
   .dGrab{width:44px;height:5px;border-radius:3px;background:#d8d4cc;margin:2px auto 12px}
   .dClose{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.94);color:var(--ink-2);font-size:14px;box-shadow:0 1px 6px rgba(20,31,43,.2);z-index:2;border:none}
   .dPhotoWrap{position:relative;border-radius:16px;overflow:hidden}
-  .dPhoto{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+  .dPhoto{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;transition:opacity .18s}
   .dPhotoWrap .cdot{position:absolute;right:10px;bottom:10px;width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}
   .dNameRow{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-top:16px}
   .dName{font-family:var(--serif);font-weight:600;font-size:24px;color:var(--ink);line-height:1.25}
@@ -567,7 +567,9 @@
    try{
     const s=stores.find(x=>x.id===id);if(!s)return;detailId=id;
     const pw=$("dPhotoWrap");
-    if(s.photo){pw.style.display="";$("dPhoto").src=photoUrl(s,800);$("dCdot").style.background=catOf((s.categories||["other"])[0]).color;}
+    if(s.photo){pw.style.display="";const im=$("dPhoto");im.style.opacity="0";
+      im.onload=()=>{im.style.opacity="1";};im.onerror=()=>{pw.style.display="none";};
+      im.src=photoUrl(s,800);$("dCdot").style.background=catOf((s.categories||["other"])[0]).color;}
     else pw.style.display="none";
     $("dName").textContent=s.name;
     $("dBadges").innerHTML=michBadge(s)+(isNew(s)?' <span class="newBadge">new!</span>':"");
