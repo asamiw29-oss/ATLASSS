@@ -557,12 +557,12 @@
    try{
     const s=stores.find(x=>x.id===id);if(!s)return;detailId=id;
     const pw=$("dPhotoWrap");
-    if(s.photo){pw.style.display="";$("dPhoto").src=photoUrl(s,800);$("dCdot").style.background=catColor(mainCat(s));}
+    if(s.photo){pw.style.display="";$("dPhoto").src=photoUrl(s,800);$("dCdot").style.background=catOf((s.categories||["other"])[0]).color;}
     else pw.style.display="none";
     $("dName").textContent=s.name;
     $("dBadges").innerHTML=michBadge(s)+(isNew(s)?' <span class="newBadge">new!</span>':"");
-    $("dChips").innerHTML=catList(s).map(c=>`<span class="dChip" style="border-color:${catColor(c)};color:${catColor(c)}">${esc(c)}</span>`).join("")
-      +`<span class="dCity">${esc(cityJa(s.region))} ${esc(s.region)}</span>`;
+    $("dChips").innerHTML=(s.categories||["other"]).map(cid=>{const c=catOf(cid);return `<span class="dChip" style="border-color:${c.color};color:${c.color}">${esc(c.label)}</span>`;}).join("")
+      +`<span class="dCity">${esc(airOf(s.region).city)} ${esc(s.region)}</span>`;
     $("dMemo").textContent=s.memo||"";
     const reg=s.registrant||(s.role==="ca"?"CA":s.role==="pilot"?"Pilot":"");
     $("dMeta").textContent=(reg?("登録："+reg):"")+(s.delivery?"　·　デリバリー可 🚴":"");
