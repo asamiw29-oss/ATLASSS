@@ -14,12 +14,12 @@
 
    Bump VERSION to force a clean rollover; activate() deletes all older caches. */
 
-const VERSION = "v19";
+const VERSION = "v20";
 const SHELL = "atlas-shell-" + VERSION;   // app shell + core CDN libs
 const TILES = "atlas-tiles-" + VERSION;   // map tiles (capped)
 const TILE_LIMIT = 300;                   // max tiles kept offline
 const PHOTOS = "atlas-photos-" + VERSION; // store thumbnails (runtime cache)
-const PHOTO_LIMIT = 400;                  // max thumbnails kept
+const PHOTO_LIMIT = 1000;                 // max thumbnails kept
 
 const CORE = ["./", "./index.html", "./manifest.json"];
 const CDN = [
@@ -53,7 +53,9 @@ self.addEventListener("activate", e => {
 const isTile = u => u.hostname.endsWith("stadiamaps.com");
 // Places photo media: immutable per photo name, so cache-first like tiles.
 // (The blanket googleapis.com rule below would otherwise never cache them.)
-const isPhoto = u => u.hostname === "places.googleapis.com" && u.pathname.includes("/media");
+// Same-origin migrated copies under /photos/ are immutable too: cache-first.
+const isPhoto = u => (u.hostname === "places.googleapis.com" && u.pathname.includes("/media")) ||
+  (u.origin === self.location.origin && u.pathname.includes("/photos/"));
 // Live data that must never be served stale.
 const isData = u =>
   u.hostname === "docs.google.com" ||

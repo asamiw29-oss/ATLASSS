@@ -567,8 +567,9 @@
    try{
     const s=stores.find(x=>x.id===id);if(!s)return;detailId=id;
     const pw=$("dPhotoWrap");
-    if(s.photo){pw.style.display="";const im=$("dPhoto");im.style.opacity="0";
-      im.onload=()=>{im.style.opacity="1";};im.onerror=()=>{pw.style.display="none";};
+    if(s.photo){pw.style.display="";const im=$("dPhoto");im.style.opacity="0";im.dataset.fbk="";
+      im.onload=()=>{im.style.opacity="1";};
+      im.onerror=()=>{if(!im.dataset.fbk){im.dataset.fbk="1";const g=googlePhotoUrl(s,800);if(g){im.src=g;return;}}pw.style.display="none";};
       im.src=photoUrl(s,800);$("dCdot").style.background=catOf((s.categories||["other"])[0]).color;}
     else pw.style.display="none";
     $("dName").textContent=s.name;
@@ -630,10 +631,17 @@
       window.addEventListener("mousemove",mm);window.addEventListener("mouseup",mu);
     });
   })();
-  // Store photo: the sheet keeps the Places photo resource name; the media URL
-  // is built at render time so the API key itself is never stored in the sheet.
-  function photoUrl(s,w){if(!s||!s.photo||!EMBED_CFG.gkey)return "";
+  // Store photo: stores whose photo was migrated into the repo serve the
+  // same-origin copy (photos/{place_id}.jpg), so displaying it no longer bills
+  // the Places media endpoint. Stores without a local copy (new registrations)
+  // use the Places media URL, built at render time from the photo resource
+  // name in the sheet so the API key itself is never stored in the sheet.
+  // The img onerror handlers swap a missing local file for the Places URL once.
+  function googlePhotoUrl(s,w){if(!s||!s.photo||!EMBED_CFG.gkey)return "";
     return "https://places.googleapis.com/v1/"+s.photo+"/media?maxWidthPx="+(w||160)+"&key="+EMBED_CFG.gkey;}
+  function photoUrl(s,w){if(!s||!s.photo)return "";
+    if(s.place_id)return "photos/"+encodeURIComponent(s.place_id)+".jpg";
+    return googlePhotoUrl(s,w);}
   // Load thumbnails only when their row is near the viewport, so opening the
   // app does not fire hundreds of photo requests at once.
   const thumbIO=("IntersectionObserver" in window)?new IntersectionObserver(es=>{
@@ -1167,7 +1175,7 @@
     const pidParam=s.place_id?encodeURIComponent(s.place_id):"";
     const gmapUrl=`https://www.google.com/maps/search/?api=1&query=${gmapText}${pidParam?`&query_place_id=${pidParam}`:""}`;
     const thumb=photoUrl(s);
-    it.innerHTML=`${thumb?`<span class="thumbWrap"><img class="thumb" data-src="${thumb}" alt="" decoding="async" onerror="this.parentNode.remove()"><span class="cdot" style="background:${c.color}"></span></span>`:`<span class="mk" style="background:${c.color}"></span>`}<div class="body">
+    it.innerHTML=`${thumb?`<span class="thumbWrap"><img class="thumb" data-src="${thumb}" data-fb="${googlePhotoUrl(s)}" alt="" decoding="async" onerror="if(this.dataset.fb&&!this.dataset.fbk){this.dataset.fbk='1';this.src=this.dataset.fb;}else{this.parentNode.remove();}"><span class="cdot" style="background:${c.color}"></span></span>`:`<span class="mk" style="background:${c.color}"></span>`}<div class="body">
       <div class="name">${esc(s.name)}${isNew(s)?`<span class="newBadge">new!</span>`:""}${michBadge(s)}${roleHtml}${delHtml}</div>
       <div class="sub">${esc(catText)}<span class="dot">·</span>${esc(a.city)} <span class="code">${esc(a.code)}</span>${d!=null?`<span class="dist">${fmtDist(d)}</span>`:""}</div>
       ${s.memo?`<div class="note">${esc(s.memo)}</div>`:""}</div>
