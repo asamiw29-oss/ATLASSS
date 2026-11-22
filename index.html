@@ -141,6 +141,9 @@
   .dDiv{border-top:1px solid var(--line);margin:16px 0 12px}
   .dMemoLabel{font-size:11px;letter-spacing:.1em;color:var(--ink-3);margin-bottom:6px}
   .dMemo{font-size:14.5px;line-height:1.65;color:var(--ink);white-space:pre-wrap}
+  .dHoursLabel{font-size:11px;letter-spacing:.1em;color:var(--ink-3);margin:16px 0 6px}
+  .dHours{font-size:13px;line-height:1.75;color:var(--ink-2);white-space:pre-wrap}
+  .dHoursNote{font-size:11px;color:var(--ink-3);margin-top:4px}
   .dMeta{font-size:12.5px;color:var(--ink-2);margin-top:14px}
   .dBtns{display:flex;gap:10px;margin-top:16px}
   .dBtns a,.dBtns button{flex:1;text-align:center;padding:13px 0;border-radius:12px;font-size:14px;text-decoration:none}
@@ -424,6 +427,9 @@
     <div class="dDiv"></div>
     <div class="dMemoLabel">メモ</div>
     <div class="dMemo" id="dMemo"></div>
+    <div class="dHoursLabel" id="dHoursLabel" style="display:none">営業時間</div>
+    <div class="dHours" id="dHours"></div>
+    <div class="dHoursNote" id="dHoursNote" style="display:none">※ Googleの情報です</div>
     <div class="dMeta" id="dMeta"></div>
   </div>
   <div class="dFoot">
@@ -488,7 +494,7 @@
       <div class="inner">
         <ol class="steps">
           <li>Google スプレッドシートを新規作成。シート名を <code>stores</code> にし、1行目に下のヘッダーを貼る。
-            <div class="hrow" id="hdrRow">id,name,category,region,lat,lng,memo,address,registrant,role,delivery,created_at,place_id,photo</div>
+            <div class="hrow" id="hdrRow">id,name,category,region,lat,lng,memo,address,registrant,role,delivery,created_at,place_id,photo,hours</div>
           </li>
           <li>共有 → 「リンクを知る全員」→ <b>閲覧者</b>。URLの <code>/d/</code> と <code>/edit</code> の間がシートID。</li>
           <li>拡張機能 → Apps Script。下のコードを貼って保存。
@@ -583,6 +589,8 @@
     $("dChips").innerHTML=(s.categories||["other"]).map(cid=>{const c=catOf(cid);return `<span class="dChip" style="border-color:${c.color};color:${c.color}">${esc(c.label)}</span>`;}).join("")
       +`<span class="dCity">${esc(airOf(s.region).city)} ${esc(s.region)}</span>`;
     $("dMemo").textContent=s.memo||"";
+    if(s.hours){$("dHoursLabel").style.display="";$("dHoursNote").style.display="";$("dHours").textContent=s.hours;}
+    else{$("dHoursLabel").style.display="none";$("dHoursNote").style.display="none";$("dHours").textContent="";}
     const reg=s.registrant||(s.role==="ca"?"CA":s.role==="pilot"?"Pilot":"");
     $("dMeta").textContent=(reg?("登録："+reg):"")+(s.delivery?"　·　デリバリー可 🚴":"");
     const gt=encodeURIComponent(s.name+" "+(s.address||""));
@@ -968,7 +976,7 @@
   let fMacro="ALL",fAirport="ALL",fCat="ALL",fMich=false,q="",filtersOpen=false;
   let map,layer,markers=[],temp=null,editing=null,zoomLabels=false;
   let form=blank();
-  function blank(){return{region:getLastAir(),cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:"",photoName:""};}
+  function blank(){return{region:getLastAir(),cats:["cafe"],lat:null,lng:null,delivery:false,role:getLastRole(),placeId:"",photoName:"",hours:""};}
 
   function getCfg(){if(HAS_EMBED)return{sheet:EMBED_CFG.sheet,apps:EMBED_CFG.apps};try{return JSON.parse(localStorage.getItem(CFG_KEY))||{};}catch(e){return{};}}
   function setCfg(c){try{localStorage.setItem(CFG_KEY,JSON.stringify(c));}catch(e){}}
@@ -1255,7 +1263,7 @@
         server.push({id:g(row,"id")||uid(),name,categories:cats,region,lat,lng,
           memo:g(row,"memo"),address:g(row,"address"),
           registrant:g(row,"registrant"),role:normRole(g(row,"role")),delivery:normBool(g(row,"delivery")),
-          created_at:g(row,"created_at"),place_id:g(row,"place_id"),photo:g(row,"photo")});}
+          created_at:g(row,"created_at"),place_id:g(row,"place_id"),photo:g(row,"photo"),hours:g(row,"hours")});}
       const sids=new Set(server.map(s=>s.id));
       // Pending local changes must survive a sync, or an offline edit would silently
       // revert to the server copy the moment we reconnect.
@@ -1398,7 +1406,7 @@
     document.getElementById("mTitle").textContent="お店を追加";document.getElementById("mDelete").style.display="none";
     newSession();fill({name:"",memo:"",registrant:getLastReg(),url:""});openM();}
   function openEdit(id){const s=stores.find(x=>x.id===id);if(!s)return;editing=id;
-    form={region:s.region,cats:(s.categories&&s.categories.length?s.categories.slice():["other"]),lat:s.lat,lng:s.lng,delivery:!!s.delivery,role:normRole(s.role),placeId:s.place_id||"",photoName:s.photo||""};
+    form={region:s.region,cats:(s.categories&&s.categories.length?s.categories.slice():["other"]),lat:s.lat,lng:s.lng,delivery:!!s.delivery,role:normRole(s.role),placeId:s.place_id||"",photoName:s.photo||"",hours:s.hours||""};
     document.getElementById("mTitle").textContent="お店を編集";document.getElementById("mDelete").style.display="";
     newSession();fill({name:s.name,memo:s.memo,registrant:s.registrant,url:s.url});openM();}
   function fill(s){
@@ -1476,13 +1484,15 @@
       const r=await fetch("https://places.googleapis.com/v1/places:searchText",{
         method:"POST",signal:ac?ac.signal:undefined,
         headers:{"Content-Type":"application/json","X-Goog-Api-Key":key,
-          "X-Goog-FieldMask":"places.location,places.displayName,places.id,places.photos"},
+          "X-Goog-FieldMask":"places.location,places.displayName,places.id,places.photos,places.regularOpeningHours"},
         body:JSON.stringify({textQuery:q,languageCode:"ja"})});
       const d=await r.json();
       if(d.places&&d.places.length){const p=d.places[0];
         return{lat:p.location.latitude,lng:p.location.longitude,
           name:(p.displayName&&p.displayName.text)||null,placeId:p.id||null,
-          photoName:(p.photos&&p.photos[0]&&p.photos[0].name)||""};}
+          photoName:(p.photos&&p.photos[0]&&p.photos[0].name)||"",
+          hours:((p.regularOpeningHours&&p.regularOpeningHours.weekdayDescriptions)||[]).join("\n")};}
+
     }catch(e){}finally{clearTimeout(timer);}
     return null;
   }
@@ -1529,6 +1539,7 @@
     setLatLng(res.lat,res.lng);map.setView(dispLL(res.lat,res.lng),16);
     if(res.placeId)form.placeId=res.placeId;
     if(res.photoName!==undefined)form.photoName=res.photoName||"";
+    if(res.hours!==undefined)form.hours=res.hours||"";
     const n=document.getElementById("fName");if(res.name&&!n.value.trim())n.value=res.name;validate();inp.value="";}
 
   // ---- Google Places (New) autocomplete ----
@@ -1623,7 +1634,7 @@
     try{
       const url="https://places.googleapis.com/v1/places/"+encodeURIComponent(it.placeId)+"?sessionToken="+encodeURIComponent(acSession||"");
       const r=await fetch(url,{
-        headers:{"X-Goog-Api-Key":key,"X-Goog-FieldMask":"id,displayName,location,formattedAddress,primaryType,types,photos"}
+        headers:{"X-Goog-Api-Key":key,"X-Goog-FieldMask":"id,displayName,location,formattedAddress,primaryType,types,photos,regularOpeningHours"}
       });
       const d=await r.json();
       if(d.location){
@@ -1634,6 +1645,7 @@
         refreshCatUI();
         if(d.id)form.placeId=d.id;
         form.photoName=(d.photos&&d.photos[0]&&d.photos[0].name)||"";
+        form.hours=((d.regularOpeningHours&&d.regularOpeningHours.weekdayDescriptions)||[]).join("\n");
       }else{
         toast("場所の詳細を取得できませんでした");
       }
@@ -1731,7 +1743,7 @@
       memo:document.getElementById("fMemo").value.trim(),address:"",
       registrant,role:normRole(form.role),
       delivery:!!form.delivery,
-      created_at:new Date().toISOString(),place_id:form.placeId||"",photo:form.photoName||""};
+      created_at:new Date().toISOString(),place_id:form.placeId||"",photo:form.photoName||"",hours:form.hours||""};
     const isEdit=!!editing;
     if(!isEdit){
       const dup=findDuplicate(rec);
@@ -1786,7 +1798,7 @@
         region:normReg(s.region)||detectRegion(s.lat,s.lng),
         lat:s.lat,lng:s.lng,memo:s.memo||s.note||"",address:s.address||"",
         registrant:s.registrant||"",role:normRole(s.role),delivery:normBool(s.delivery),
-        created_at:s.created_at||"",place_id:s.place_id||"",photo:s.photo||"",url:s.url||""});add++;}});
+        created_at:s.created_at||"",place_id:s.place_id||"",photo:s.photo||"",hours:s.hours||"",url:s.url||""});add++;}});
     saveCache();render();toast(add+" 軒を読み込みました（マージ）");}catch(e){toast("読み込めないファイルです");}};rd.readAsText(file);}
 
   function el(t,c){const e=document.createElement(t);if(c)e.className=c;return e;}
