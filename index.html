@@ -540,7 +540,7 @@
   // "new!" badge: stores created within the last 3 days (72h).
   const NEW_MS=3*24*60*60*1000;
   function isNew(s){if(!s||!s.created_at)return false;const t=Date.parse(s.created_at);return !isNaN(t)&&(Date.now()-t)<NEW_MS;}
-  // Michelin Guide distinctions, keyed by Google place_id (cross-checked 2026-11-06).
+  // Michelin Guide distinctions, keyed by Google place_id (cross-checked 2026-11-06, extended 2026-11-22).
   // t: star = starred, bib = Bib Gourmand, sel = guide-listed (Selected/Plate),
   // former = held a distinction in the past (shown muted, still counts for the filter).
   const MICHELIN={
@@ -555,7 +555,13 @@
     "ChIJg3SVybo3zDERADqEe4aL-VA":{t:"bib",label:"ビブグルマン"},
     "ChIJAenlH3MZ2jERyoosIJnXBeE":{t:"sel",label:"ミシュラン掲載"},
     "ChIJKyRwBs-Y4jARYGe3Dw40LoI":{t:"former",label:"元ビブグルマン"},
-    "ChIJx15N6feifDURmUuQT_G1CAc":{t:"former",label:"元ビブグルマン"}
+    "ChIJx15N6feifDURmUuQT_G1CAc":{t:"former",label:"元ビブグルマン"},
+    "ChIJO38vl4D_AzQRWestb7UvqH8":{t:"bib",label:"ビブグルマン"},
+    "ChIJcaCRCusABDQRbEmVNBREGAM":{t:"bib",label:"ビブグルマン"},
+    "ChIJkUb5O0EBBDQRNPD7SLOPbbk":{t:"bib",label:"ビブグルマン"},
+    "ChIJO9DC7GgBBDQRLlULwR1hSiE":{t:"bib",label:"ビブグルマン"},
+    "ChIJDRE4ADUBBDQRs91Wt7z16H8":{t:"former",label:"元ミシュラン掲載"},
+    "ChIJVcBKfcgABDQRFye0RlJKObk":{t:"former",label:"元ミシュラン掲載"}
   };
   function michelinOf(s){return (s&&s.place_id&&MICHELIN[s.place_id])||null;}
   function michBadge(s){const m=michelinOf(s);return m?`<span class="michBadge${m.t==="former"?" former":""}">${esc(m.label)}</span>`:"";}
