@@ -1196,9 +1196,9 @@
       <a class="itgm" href="${gmapUrl}" target="_blank" rel="noopener" aria-label="Google Mapで開く"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5c3.8-4.3 6-7.6 6-11a6 6 0 1 0-12 0c0 3.4 2.2 6.7 6 11z"/><circle cx="12" cy="10.3" r="2.1"/></svg></a>`;
     const timg=it.querySelector("img.thumb");
     if(timg){if(thumbIO)thumbIO.observe(timg);else if(timg.dataset.src)timg.src=timg.dataset.src;}
-    // In list view the map is hidden, so the map popup (with its edit button) is
-    // unreachable — open the edit form directly instead of flying the hidden map.
-    it.onclick=()=>{openDetail(s.id);};
+    // Open the detail sheet; in map view also fly the map in close to the pin
+    // (in list view the map is hidden, so flying it would do nothing visible).
+    it.onclick=()=>{openDetail(s.id);if(!document.querySelector(".work").classList.contains("listview"))flyTo(s);};
     // Tapping the GMap button must open Maps only, not the row's edit/fly action.
     const gm=it.querySelector(".itgm");if(gm)gm.onclick=e=>e.stopPropagation();
     return it;
@@ -1231,8 +1231,7 @@
       groups.get(code).slice().sort(byNew).forEach(s=>wrap.appendChild(listItemEl(s)));
     });
   }
-  function flyTo(s){map.flyTo(dispLL(s.lat,s.lng),Math.max(map.getZoom(),14),{duration:.6});
-    markers.forEach(m=>{if(m._sid===s.id)m.openPopup();});}
+  function flyTo(s){map.flyTo(dispLL(s.lat,s.lng),Math.max(map.getZoom(),16),{duration:.6});}
   function fitFilter(){const p=filtered().map(s=>dispLL(s.lat,s.lng));if(p.length)try{map.fitBounds(p,{padding:[50,50],maxZoom:14});}catch(e){}}
 
   function parseCSV(text){const rows=[];let row=[],f="",i=0,q=false;
